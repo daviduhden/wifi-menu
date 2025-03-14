@@ -32,7 +32,6 @@ $ doas ./wifi-menu.pl iwn0
   ':.  ':.    /___\    ,:'  ,:'
    ':.       /_____\      ,:'
             /       \ 
-```
 
 1) Normal.iwn0         2) Test.iwn0             7) Raspi3.iwn0
 2) Privacy.iwn0        3) Android.iwn0
