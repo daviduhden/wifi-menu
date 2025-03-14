@@ -52,8 +52,6 @@ $ doas ./wifi-menu.pl iwn0
 [+] Running dhclient
 iwn0: no lease..... got lease
 iwn0: bound to 192.168.43.113 from 192.168.43.1 (12:34:56:78:9a:bc)
-dnscrypt_proxy(ok)
-dnscrypt_proxy(ok)
 unbound(ok)
 unbound(ok)
 ```

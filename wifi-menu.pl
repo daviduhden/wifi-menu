@@ -187,7 +187,7 @@ sub saved_connect {
     system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
-    system("/usr/sbin/rcctl restart dnscrypt_proxy unbound");
+    system("/usr/sbin/rcctl restart unbound");
     exit 0;
 }
 
@@ -202,7 +202,7 @@ sub connect {
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
-    system("/usr/sbin/rcctl restart dnscrypt_proxy unbound");
+    system("/usr/sbin/rcctl restart unbound");
     exit 0;
 }
 
