@@ -130,10 +130,19 @@ sub conf_create {
         exit 1;
     }
 
+    # Ask if the user wants to configure Host-based Access Point mode
+    print "\n[+] ${BLU}Do you want to configure Host-based Access Point mode? (y/N): ${RST}";
+    chomp(my $hostap_choice = <STDIN>);
+    my $hostap_config = "";
+    if (lc($hostap_choice) eq 'y') {
+        $hostap_config = "mode 11g mediaopt hostap\n";
+    }
+
     # Create configuration file content following the OpenBSD hostname.if format
     my $config = << "EOF";
 -inet6 -bssid -chan -nwid -nwkey -wpa -wpakey
 join "$ssid" wpakey "$password"
+$hostap_config
 inet autoconf
 EOF
 
