@@ -20,7 +20,7 @@ $ doas ./wifi-menu <interface>
 ## Example
 
 ```sh
-$ doas ./wifi-menu iwn0
+$ doas ./wifi-menu.pl iwn0
 ```
 
 ```
