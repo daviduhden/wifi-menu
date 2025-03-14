@@ -1,7 +1,28 @@
 # OpenBSD Wireless Network Manager
 
-Usage :
-	$ doas ./wifi-menu <interface\>
+This script helps manage wireless network connections on OpenBSD. It allows you to save, list, and connect to Wi-Fi networks using a simple menu interface.
+
+## Usage
+
+Run the script with root privileges and specify the network interface:
+
+```sh
+$ doas ./wifi-menu <interface>
+```
+
+## Features
+
+- **Scan for Networks**: Lists available Wi-Fi networks.
+- **Save Configurations**: Saves network configurations for future use.
+- **Connect to Networks**: Connects to saved or new networks.
+- **Randomize MAC Address**: Optionally randomizes the MAC address for privacy.
+
+## Example
+
+```sh
+$ doas ./wifi-menu iwn0
+```
+
 ```
   .;'  ,;'             `;,  `;,    OpenBSD wireless network manager
  .;'  ,;'  ,;'     `;,  `;,  `;,
@@ -10,6 +31,7 @@ Usage :
   ':.  ':.    /___\    ,:'  ,:'
    ':.       /_____\      ,:'
             /       \ 
+```
 
 1) Normal.iwn0         2) Test.iwn0             7) Raspi3.iwn0
 2) Privacy.iwn0        3) Android.iwn0
@@ -35,3 +57,8 @@ dnscrypt_proxy(ok)
 unbound(ok)
 unbound(ok)
 ```
+
+## Notes
+
+- Ensure the Wi-Fi configuration directory (`/etc/wifi_saved`) exists with proper permissions.
+- The script must be run as root to modify network settings.
