@@ -1,60 +1,41 @@
 # OpenBSD Wireless Network Manager
 
+## Overview
+
 This script helps manage wireless network connections on OpenBSD. It allows you to save, list, and connect to Wi-Fi networks using a simple menu interface.
-
-## Usage
-
-Run the script with root privileges and specify the network interface:
-
-```sh
-$ doas ./wifi-menu.pl <interface>
-```
 
 ## Features
 
-- **Scan for Networks**: Lists available Wi-Fi networks.
-- **Save Configurations**: Saves network configurations for future use.
-- **Connect to Networks**: Connects to saved or new networks.
-- **Randomize MAC Address**: Optionally randomizes the MAC address for privacy.
-- **Host-based Access Point Mode**: Optionally configure the interface as an access point.
+- Displays available Wi-Fi networks.
+- Stores network configurations for future use.
+- Connects to both saved and new networks.
+- Randomizes the MAC address for enhanced privacy.
+- Configures the interface as a Host-based Access Point.
 
-## Example
+## Requirements
 
-```sh
-$ doas ./wifi-menu.pl iwn0
-```
+- Must be run as root.
+- [OpenBSD operating system](https://www.openbsd.org/faq/faq4.html#Download).
 
-```
-  .;'  ,;'             `;,  `;,    OpenBSD wireless network manager
- .;'  ,;'  ,;'     `;,  `;,  `;,
- ::   ::   :   ( )   :   ::   ::
- ':.  ':.  ':. /_\ ,:'  ,:'  ,:'
-  ':.  ':.    /___\    ,:'  ,:'
-   ':.       /_____\      ,:'
-            /       \ 
+## Usage
 
-1) Normal.iwn0         2) Test.iwn0             7) Raspi3.iwn0
-2) Privacy.iwn0        3) Android.iwn0
-3) MyVPN.iwn0          4) CryptoLab.iwn0
+1. Clone the repository:
+    ```sh
+    git clone https://github.com/daviduhden/wifi-menu.git
+    cd wifi-menu
+    ```
 
-[+] Choose a previously saved wifi connection or "Enter" to skip:
-1) Android1        4) Wifi4          7) Wifi7
-2) Wifi2           5) Wifi5
-3) Wifi3           6) Wifi6
+2. Make the script executable:
+    ```sh
+    chmod +x wifi-menu.pl
+    ```
 
-[+] Choose wifi connection or "Enter" to quit: 1
-[+] Enter the passphrase for "Android1"?
-[+] Password:
-[+] Creating new configuration using "Android1"
-[+] Connecting using file "Android1"
-[+] Configured interface iwn0; ESSID is "Android1"
-[+] Interface iwn0 is up
-[+] Running dhclient
-iwn0: no lease..... got lease
-iwn0: bound to 192.168.43.113 from 192.168.43.1 (12:34:56:78:9a:bc)
-unbound(ok)
-unbound(ok)
-```
+3. Run the script:
+    ```sh
+    perl wifi-menu.pl <interface>
+    ```
+
+4. Follow the interactive prompts to apply the desired configurations.
 
 ## Notes
 
