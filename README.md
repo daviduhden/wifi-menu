@@ -7,7 +7,7 @@ This script helps manage wireless network connections on OpenBSD. It allows you 
 Run the script with root privileges and specify the network interface:
 
 ```sh
-$ doas ./wifi-menu <interface>
+$ doas ./wifi-menu.pl <interface>
 ```
 
 ## Features
@@ -16,6 +16,7 @@ $ doas ./wifi-menu <interface>
 - **Save Configurations**: Saves network configurations for future use.
 - **Connect to Networks**: Connects to saved or new networks.
 - **Randomize MAC Address**: Optionally randomizes the MAC address for privacy.
+- **Host-based Access Point Mode**: Optionally configure the interface as an access point.
 
 ## Example
 
@@ -60,3 +61,5 @@ unbound(ok)
 
 - Ensure the Wi-Fi configuration directory (`/etc/wifi_saved`) exists with proper permissions.
 - The script must be run as root to modify network settings.
+- The passphrase for WPA networks must be between 8 and 63 characters.
+- The script supports configuring the interface as a Host-based Access Point.
