@@ -49,7 +49,6 @@ if (!$INT) {
 sub read_saved {
     # Clear wireless settings and randomize MAC address
     system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
-    system("/sbin/ifconfig $INT lladdr random");
 
     # Read list of saved configurations
     opendir(my $dh, $WIFI_DIR) or do {
@@ -88,7 +87,6 @@ sub read_saved {
 # and then prompts the user to choose an SSID and enter its WPA passphrase.
 sub conf_create {
     system("/sbin/ifconfig $INT up");
-    system("/usr/bin/pkill dhclient");
 
     # Scan for available wifi networks.
     print "[*] ${BLU}Scanning for wifi networks on interface $INT...${RST}\n";
@@ -135,9 +133,8 @@ sub conf_create {
     # Create configuration file content following the OpenBSD hostname.if format
     my $config = << "EOF";
 -inet6 -bssid -chan -nwid -nwkey -wpa -wpakey
-nwid "$ssid" lladdr "random"
-wpakey "$password"
-dhcp
+join "$ssid" wpakey "$password"
+inet autoconf
 EOF
 
     # Save the configuration file
@@ -158,7 +155,6 @@ sub saved_connect {
     my ($conf_file) = @_;
     print "[+] ${BLU}Connecting using saved configuration file ${YLW}\"$conf_file\"${RST}\n";
     system("/sbin/ifconfig $INT up");
-    system("/usr/bin/pkill dhclient");
 
     # Open the saved file and extract the nwid and wpakey values.
     my ($ssid, $wpakey);
@@ -178,12 +174,10 @@ sub saved_connect {
     }
 
     # Configure the interface using the saved configuration.
-    system("/sbin/ifconfig $INT nwid \"$ssid\" wpakey \"$wpakey\"");
+    system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
     system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
-    print "[+] ${BLU}Running dhclient${RST}\n";
-    system("/sbin/dhclient $INT");
     system("/usr/sbin/rcctl restart dnscrypt_proxy unbound");
     exit 0;
 }
@@ -194,14 +188,11 @@ sub connect {
     my ($ssid, $password) = @_;
     print "[+] ${BLU}Connecting using configuration for ${YLW}\"$ssid\"${RST}\n";
     system("/sbin/ifconfig $INT up");
-    system("/usr/bin/pkill dhclient");
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
     system("/bin/cp \"$conf_file\" /etc/hostname.$INT");
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
-    system("/sbin/ifconfig $INT nwid \"$ssid\" wpakey \"$password\"");
+    system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
-    print "[+] ${BLU}Running dhclient${RST}\n";
-    system("/sbin/dhclient $INT");
     system("/usr/sbin/rcctl restart dnscrypt_proxy unbound");
     exit 0;
 }
