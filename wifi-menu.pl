@@ -31,6 +31,11 @@ my $GRY = "\033[37m";
 
 # --- Global variables ---
 my $INT      = $ARGV[0] // '';
+
+if (!$INT) {
+    print STDERR "[!] ${RED}Usage: doas $0 [interface]${RST}\n";
+    exit 1;
+}
 my $WIFI_DIR = "/etc/wifi_saved";
 
 # --- Check for root privileges and interface argument ---
@@ -43,12 +48,20 @@ if (!$INT) {
     exit 1;
 }
 
-# --- Subroutine: read_saved ---
+    my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to clear wireless settings${RST}\n";
+        exit 1;
+    }
 # Clears the current wireless settings (per OpenBSD ifconfig(8) docs) and then
 # looks for previously saved wifi configurations. If none are found, it calls conf_create.
 sub read_saved {
-    # Clear wireless settings and randomize MAC address
-    system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
+    unless (opendir(my $dh, $WIFI_DIR)) {
+    my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to clear wireless settings${RST}\n";
+        exit 1;
+    }
 
     # Read list of saved configurations
     opendir(my $dh, $WIFI_DIR) or do {
@@ -86,7 +99,15 @@ sub read_saved {
 # Brings the interface up, scans for available networks using ifconfig's scan option,
 # and then prompts the user to choose an SSID and enter its WPA passphrase.
 sub conf_create {
-    system("/sbin/ifconfig $INT up");
+    my $scan_output = `/sbin/ifconfig $INT scan 2>/dev/null`;
+    if ($? != 0) {
+        print "[!] ${RED}Failed to scan for wifi networks${RST}\n";
+        exit 1;
+    }
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    }
 
     # Scan for available wifi networks.
     print "[*] ${BLU}Scanning for wifi networks on interface $INT...${RST}\n";
@@ -144,11 +165,17 @@ sub conf_create {
 join "$ssid" wpakey "$password"
 $hostap_config
 inet autoconf
-EOF
-
+    open(my $fh, '>', $conf_file) or do {
+        print STDERR "[!] ${RED}Cannot write to $conf_file: $!${RST}\n";
     # Save the configuration file
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
-    open(my $fh, '>', $conf_file) or die "Cannot write to $conf_file: $!";
+    open(my $fh, '>', $conf_file) or do {
+        print STDERR "[!] ${RED}Cannot write to $conf_file: $!${RST}\n";
+        exit 1;
+    };
+    print $fh $config;
+    close($fh);
+    chmod 0600, $conf_file or warn "Could not set permissions on $conf_file: $!";
     print $fh $config;
     close($fh);
     chmod 0600, $conf_file or warn "Could not set permissions on $conf_file: $!";
@@ -160,7 +187,31 @@ EOF
 # --- Subroutine: saved_connect ---
 # Reads a previously saved configuration file, extracts the SSID and WPA key,
 # and applies it using ifconfig (following OpenBSD documentation recommendations).
-sub saved_connect {
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    my $result = system("/sbin/ifconfig $INT up");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        exit 1;
+    }
+    }
     my ($conf_file) = @_;
     print "[+] ${BLU}Connecting using saved configuration file ${YLW}\"$conf_file\"${RST}\n";
     system("/sbin/ifconfig $INT up");
@@ -179,15 +230,43 @@ sub saved_connect {
     close($fh);
     unless (defined $ssid and defined $wpakey) {
         print "[!] ${RED}Invalid configuration file. Exiting.${RST}\n";
+    $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
         exit 1;
+    my $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+        exit 1;
+    }
+    $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+    my $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+        exit 1;
+    }
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+        exit 1;
+    }
     }
 
     # Configure the interface using the saved configuration.
     system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
-    system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
+    my $result = system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to copy configuration file${RST}\n";
+        exit 1;
+    }
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
-    system("/usr/sbin/rcctl restart unbound");
+    my $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        exit 1;
+    }
     exit 0;
 }
 
@@ -198,9 +277,33 @@ sub connect {
     print "[+] ${BLU}Connecting using configuration for ${YLW}\"$ssid\"${RST}\n";
     system("/sbin/ifconfig $INT up");
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
-    system("/bin/cp \"$conf_file\" /etc/hostname.$INT");
+    $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        exit 1;
+    my $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        exit 1;
+    }
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
-    system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
+    my $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
+    if ($result != 0) {
+    my $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        exit 1;
+    }
+    $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+    my $result = system("/usr/sbin/rcctl restart unbound");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        exit 1;
+    }
+    }
+    }
     print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
     system("/usr/sbin/rcctl restart unbound");
     exit 0;
