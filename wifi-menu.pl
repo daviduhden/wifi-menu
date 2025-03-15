@@ -52,6 +52,7 @@ if ($result != 0) {
 
 # --- Subroutine: read_saved ---
 sub read_saved {
+    # Attempt to open the directory containing saved wifi configurations
     unless (opendir(my $dh, $WIFI_DIR)) {
         print "[*] ${YLW}No saved wifi configuration directory found; creating $WIFI_DIR${RST}\n";
         make_path($WIFI_DIR, { mode => 0600 });
@@ -84,6 +85,7 @@ sub read_saved {
 
 # --- Subroutine: conf_create ---
 sub conf_create {
+    # Bring the interface up
     $result = system("/sbin/ifconfig $INT up");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
