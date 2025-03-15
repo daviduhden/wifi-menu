@@ -34,20 +34,24 @@ my $INT = $ARGV[0] // '';  # Network interface passed as argument
 my $WIFI_DIR = "/etc/wifi_saved";  # Directory to save wifi configurations
 
 # --- Check for root privileges and interface argument ---
-if ($> != 0) {
-    print STDERR "[!] ${RED}This script must be run as root${RST}\n";
-    exit 1;
-}
-if (!$INT) {
-    print STDERR "[!] ${RED}Usage: doas $0 [interface]${RST}\n";
-    exit 1;
+sub check_root_and_interface {
+    if ($> != 0) {
+        print STDERR "[!] ${RED}This script must be run as root${RST}\n";
+        exit 1;
+    }
+    if (!$INT) {
+        print STDERR "[!] ${RED}Usage: doas $0 [interface]${RST}\n";
+        exit 1;
+    }
 }
 
-# Clear wireless settings (per OpenBSD ifconfig(8))
-my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
-if ($result != 0) {
-    print STDERR "[!] ${RED}Failed to clear wireless settings on $INT${RST}\n";
-    exit 1;
+# --- Clear wireless settings ---
+sub clear_wireless_settings {
+    my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to clear wireless settings on $INT${RST}\n";
+        exit 1;
+    }
 }
 
 # --- Subroutine: read_saved ---
@@ -278,10 +282,16 @@ sub print_banner {
 }
 
 # --- Main Execution ---
-print_banner();
-
-unless (-d $WIFI_DIR) {
-    make_path($WIFI_DIR, { mode => 0600 }) or die "Cannot create directory $WIFI_DIR: $!";
+sub main {
+    print_banner();
+    check_root_and_interface();
+    clear_wireless_settings();
+    
+    unless (-d $WIFI_DIR) {
+        make_path($WIFI_DIR, { mode => 0600 }) or die "Cannot create directory $WIFI_DIR: $!";
+    }
+    
+    read_saved();
 }
 
-read_saved();
+main();
