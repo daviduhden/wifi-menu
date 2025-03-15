@@ -30,8 +30,8 @@ my $GRN = "\033[32m";
 my $GRY = "\033[37m";
 
 # --- Global variables ---
-my $INT = $ARGV[0] // '';
-my $WIFI_DIR = "/etc/wifi_saved";
+my $INT = $ARGV[0] // '';  # Network interface passed as argument
+my $WIFI_DIR = "/etc/wifi_saved";  # Directory to save wifi configurations
 
 # --- Check for root privileges and interface argument ---
 if ($> != 0) {
@@ -58,7 +58,7 @@ sub read_saved {
         make_path($WIFI_DIR, { mode => 0600 });
         return conf_create();
     }
-    my @saved_files = grep { !/^\./ } readdir($dh);
+    my @saved_files = grep { !/^\./ } readdir($dh);  # Get list of saved configuration files
     closedir($dh);
     
     if (!@saved_files) {
@@ -71,7 +71,7 @@ sub read_saved {
     my $i = 1;
     foreach my $f (@saved_files) {
         print "$i) $f\n";
-        $file{$i} = $f;
+        $file{$i} = $f;  # Map file index to file name
         $i++;
     }
     print "\n[+] ${BLU}Choose a previously saved wifi connection or press ${YLW}Enter${BLU} to create a new one: ${RST}";
@@ -102,7 +102,7 @@ sub conf_create {
     my @networks;
     foreach my $line (split /\n/, $scan_output) {
         if ($line =~ /nwid\s+(\S+)/) {
-            push @networks, $1;
+            push @networks, $1;  # Extract network IDs (SSIDs)
         }
     }
     if (!@networks) {
@@ -115,7 +115,7 @@ sub conf_create {
     my $i = 1;
     foreach my $net (@networks) {
         print "$i) $net\n";
-        $list{$i} = $net;
+        $list{$i} = $net;  # Map network index to SSID
         $i++;
     }
     print "\n[+] ${BLU}Choose a wifi connection or press ${YLW}Enter${BLU} to quit: ${RST}";
