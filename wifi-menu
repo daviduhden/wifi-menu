@@ -33,6 +33,12 @@ my $GRY = "\033[37m";
 my $INT = $ARGV[0] // '';  # Network interface passed as argument
 my $WIFI_DIR = "/etc/wifi_saved";  # Directory to save wifi configurations
 
+# --- Binary paths ---
+my $IFCONFIG = "/sbin/ifconfig";
+my $CP = "/bin/cp";
+my $DHCPCONTROL = "/usr/sbin/dhcpleasectl";
+my $RCCTL = "/usr/sbin/rcctl";
+
 # --- Check for root privileges and interface argument ---
 sub check_root_and_interface {
     if ($> != 0) {
@@ -47,7 +53,7 @@ sub check_root_and_interface {
 
 # --- Clear wireless settings ---
 sub clear_wireless_settings {
-    my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
+    my $result = system("$IFCONFIG $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to clear wireless settings on $INT${RST}\n";
         exit 1;
@@ -90,7 +96,7 @@ sub read_saved {
 # --- Subroutine: conf_create ---
 sub conf_create {
     # Bring the interface up
-    $result = system("/sbin/ifconfig $INT up");
+    $result = system("$IFCONFIG $INT up");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
@@ -98,7 +104,7 @@ sub conf_create {
     # No se mata dhcpleased; en versiones modernas se utiliza dhcpleasectl para renovar el lease.
     
     print "[*] ${BLU}Scanning for wifi networks on interface $INT...${RST}\n";
-    my $scan_output = `/sbin/ifconfig $INT scan 2>/dev/null`;
+    my $scan_output = `$IFCONFIG $INT scan 2>/dev/null`;
     if ($? != 0) {
         print "[!] ${RED}Failed to scan for wifi networks on $INT${RST}\n";
         exit 1;
@@ -173,7 +179,7 @@ EOF
 sub saved_connect {
     my ($conf_file) = @_;
     print "[+] ${BLU}Connecting using saved configuration file ${YLW}\"$conf_file\"${RST}\n";
-    $result = system("/sbin/ifconfig $INT up");
+    $result = system("$IFCONFIG $INT up");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
@@ -195,16 +201,16 @@ sub saved_connect {
     }
     
     if (defined $wpakey) {
-        $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+        $result = system("$IFCONFIG $INT join \"$ssid\" wpakey \"$wpakey\"");
     } else {
-        $result = system("/sbin/ifconfig $INT nwid \"$ssid\"");
+        $result = system("$IFCONFIG $INT nwid \"$ssid\"");
     }
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to join wifi network $ssid${RST}\n";
         exit 1;
     }
     
-    $result = system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
+    $result = system("$CP \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to copy configuration file${RST}\n";
         exit 1;
@@ -212,13 +218,13 @@ sub saved_connect {
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     
     # Request a new DHCP lease using dhcpleasectl (instead of directly running dhcpleased)
-    $result = system("/usr/sbin/dhcpleasectl -w 10 $INT");
+    $result = system("$DHCPCONTROL -w 10 $INT");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RST}\n";
         exit 1;
     }
     
-    $result = system("/usr/sbin/rcctl restart unbound");
+    $result = system("$RCCTL restart unbound");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
         exit 1;
@@ -230,16 +236,16 @@ sub saved_connect {
 sub connect {
     my ($ssid, $password, $config_mode) = @_;
     print "[+] ${BLU}Connecting using configuration for ${YLW}\"$ssid\"${RST}\n";
-    $result = system("/sbin/ifconfig $INT up");
+    $result = system("$IFCONFIG $INT up");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
     }
     
     if ($config_mode eq "join") {
-        $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
+        $result = system("$IFCONFIG $INT join \"$ssid\" wpakey \"$password\"");
     } else {
-        $result = system("/sbin/ifconfig $INT nwid \"$ssid\"");
+        $result = system("$IFCONFIG $INT nwid \"$ssid\"");
     }
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to join wifi network $ssid${RST}\n";
@@ -247,7 +253,7 @@ sub connect {
     }
     
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
-    $result = system("/bin/cp \"$conf_file\" /etc/hostname.$INT");
+    $result = system("$CP \"$conf_file\" /etc/hostname.$INT");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to copy configuration file to /etc/hostname.$INT${RST}\n";
         exit 1;
@@ -255,13 +261,13 @@ sub connect {
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
     
     # Request a new DHCP lease using dhcpleasectl
-    $result = system("/usr/sbin/dhcpleasectl -w 10 $INT");
+    $result = system("$DHCPCONTROL -w 10 $INT");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RST}\n";
         exit 1;
     }
     
-    $result = system("/usr/sbin/rcctl restart unbound");
+    $result = system("$RCCTL restart unbound");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
         exit 1;
