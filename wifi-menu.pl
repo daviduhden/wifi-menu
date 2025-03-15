@@ -1,11 +1,11 @@
 #!/usr/bin/perl
-
+#
 # Copyright (c) 2025 David Uhden Collado <david@uhden.dev>
-# 
+#
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 # WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
 # MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -30,12 +30,7 @@ my $GRN = "\033[32m";
 my $GRY = "\033[37m";
 
 # --- Global variables ---
-my $INT      = $ARGV[0] // '';
-
-if (!$INT) {
-    print STDERR "[!] ${RED}Usage: doas $0 [interface]${RST}\n";
-    exit 1;
-}
+my $INT = $ARGV[0] // '';
 my $WIFI_DIR = "/etc/wifi_saved";
 
 # --- Check for root privileges and interface argument ---
@@ -48,14 +43,14 @@ if (!$INT) {
     exit 1;
 }
 
+# Clear wireless settings (per OpenBSD ifconfig(8))
 my $result = system("/sbin/ifconfig $INT -inet6 -inet -bssid -chan -nwid -nwkey -wpa -wpakey");
 if ($result != 0) {
-    print STDERR "[!] ${RED}Failed to clear wireless settings${RST}\n";
+    print STDERR "[!] ${RED}Failed to clear wireless settings on $INT${RST}\n";
     exit 1;
 }
 
-# Clears the current wireless settings (per OpenBSD ifconfig(8) docs) and then
-# looks for previously saved wifi configurations. If none are found, it calls conf_create.
+# --- Subroutine: read_saved ---
 sub read_saved {
     unless (opendir(my $dh, $WIFI_DIR)) {
         print "[*] ${YLW}No saved wifi configuration directory found; creating $WIFI_DIR${RST}\n";
@@ -64,13 +59,12 @@ sub read_saved {
     }
     my @saved_files = grep { !/^\./ } readdir($dh);
     closedir($dh);
-
+    
     if (!@saved_files) {
         print "[*] ${YLW}There are no previously saved wifi connections${RST}\n";
         return conf_create();
     }
-
-    # List saved configurations with index numbers
+    
     print "\nSaved wifi configurations:\n";
     my %file;
     my $i = 1;
@@ -89,25 +83,22 @@ sub read_saved {
 }
 
 # --- Subroutine: conf_create ---
-# Brings the interface up, scans for available networks using ifconfig's scan option,
-# and then prompts the user to choose an SSID and enter its WPA passphrase.
 sub conf_create {
-    my $result = system("/sbin/ifconfig $INT up");
+    $result = system("/sbin/ifconfig $INT up");
     if ($result != 0) {
-        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
     }
-
-    # Scan for available wifi networks.
+    # No se mata dhcpleased; en versiones modernas se utiliza dhcpleasectl para renovar el lease.
+    
     print "[*] ${BLU}Scanning for wifi networks on interface $INT...${RST}\n";
     my $scan_output = `/sbin/ifconfig $INT scan 2>/dev/null`;
     if ($? != 0) {
-        print "[!] ${RED}Failed to scan for wifi networks${RST}\n";
+        print "[!] ${RED}Failed to scan for wifi networks on $INT${RST}\n";
         exit 1;
     }
     my @networks;
     foreach my $line (split /\n/, $scan_output) {
-        # Extract the network ID from lines that contain "nwid"
         if ($line =~ /nwid\s+(\S+)/) {
             push @networks, $1;
         }
@@ -116,8 +107,7 @@ sub conf_create {
         print "[!] ${RED}No available wifi connections found on interface $INT${RST}\n";
         exit 1;
     }
-
-    # List available networks
+    
     print "\nAvailable wifi networks:\n";
     my %list;
     my $i = 1;
@@ -133,33 +123,33 @@ sub conf_create {
         exit 1;
     }
     my $ssid = $list{$choice};
-    print "[+] ${BLU}Enter the passphrase for ${YLW}\"$ssid\"${BLU}:\n${RST}";
-    print "[+] Password: ";
+    print "[+] ${BLU}Enter the passphrase for ${YLW}\"$ssid\"${BLU} (leave empty if open network): ${RST}";
     ReadMode('noecho');
     chomp(my $password = <STDIN>);
     ReadMode('restore');
     print "\n";
-    if (length($password) < 8) {
-        print "[!] ${RED}wpakey:${YLW} passphrase must be between 8 and 63 characters${RST}\n";
+    if (length($password) > 0 && length($password) < 8) {
+        print "[!] ${RED}Passphrase must be between 8 and 63 characters for WPA networks${RST}\n";
         exit 1;
     }
-
-    # Ask if the user wants to configure Host-based Access Point mode
+    
     print "\n[+] ${BLU}Do you want to configure Host-based Access Point mode? (y/N): ${RST}";
     chomp(my $hostap_choice = <STDIN>);
     my $hostap_config = "";
     if (lc($hostap_choice) eq 'y') {
         $hostap_config = "mode 11g mediaopt hostap\n";
     }
-
-    # Create configuration file content following the OpenBSD hostname.if format
-    my $config = << "EOF";
-join "$ssid" wpakey "$password"
+    
+    # Use "join" if a passphrase is provided, otherwise "nwid"
+    my $config_mode = (length($password) > 0) ? "join" : "nwid";
+    my $wpa_line = (length($password) > 0) ? " wpakey \"$password\"" : "";
+    
+    my $config = <<"EOF";
+$config_mode "$ssid"$wpa_line
 $hostap_config
 inet autoconf
 EOF
 
-    # Save the configuration file
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
     open(my $fh, '>', $conf_file) or do {
         print STDERR "[!] ${RED}Cannot write to $conf_file: $!${RST}\n";
@@ -168,52 +158,60 @@ EOF
     print $fh $config;
     close($fh);
     chmod 0600, $conf_file or warn "Could not set permissions on $conf_file: $!";
-
+    
     print "[+] ${BLU}Creating new configuration using ${YLW}\"$ssid\"${RST}\n";
-    return connect($ssid, $password);
+    return connect($ssid, $password, $config_mode);
 }
 
 # --- Subroutine: saved_connect ---
-# Reads a previously saved configuration file, extracts the SSID and WPA key,
-# and applies it using ifconfig (following OpenBSD documentation recommendations).
 sub saved_connect {
     my ($conf_file) = @_;
     print "[+] ${BLU}Connecting using saved configuration file ${YLW}\"$conf_file\"${RST}\n";
-    my $result = system("/sbin/ifconfig $INT up");
+    $result = system("/sbin/ifconfig $INT up");
     if ($result != 0) {
-        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
     }
-
-    # Open the saved file and extract the nwid and wpakey values.
-    my ($ssid, $wpakey);
+    
+    my ($mode, $ssid, $wpakey);
     open(my $fh, '<', "$WIFI_DIR/$conf_file") or die "Cannot open $WIFI_DIR/$conf_file: $!";
     while (my $line = <$fh>) {
-        if ($line =~ /^join\s+"([^"]+)"\s+wpakey\s+"([^"]+)"/) {
-            $ssid = $1;
-            $wpakey = $2;
+        if ($line =~ /^(join|nwid)\s+"([^"]+)"(?:\s+wpakey\s+"([^"]+)")?/) {
+            $mode = $1;
+            $ssid = $2;
+            $wpakey = $3;  # may be undefined for open networks
         }
     }
     close($fh);
-    unless (defined $ssid and defined $wpakey) {
+    unless (defined $mode and defined $ssid) {
         print "[!] ${RED}Invalid configuration file. Exiting.${RST}\n";
         exit 1;
     }
-
-    $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    
+    if (defined $wpakey) {
+        $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$wpakey\"");
+    } else {
+        $result = system("/sbin/ifconfig $INT nwid \"$ssid\"");
+    }
     if ($result != 0) {
-        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+        print STDERR "[!] ${RED}Failed to join wifi network $ssid${RST}\n";
         exit 1;
     }
-
-    # Configure the interface using the saved configuration.
+    
     $result = system("/bin/cp \"$WIFI_DIR/$conf_file\" /etc/hostname.$INT");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to copy configuration file${RST}\n";
         exit 1;
     }
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
-    print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
+    
+    # Request a new DHCP lease using dhcpleasectl (instead of directly running dhcpleased)
+    $result = system("/usr/sbin/dhcpleasectl -w 10 $INT");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RST}\n";
+        exit 1;
+    }
+    
     $result = system("/usr/sbin/rcctl restart unbound");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
@@ -223,25 +221,40 @@ sub saved_connect {
 }
 
 # --- Subroutine: connect ---
-# Uses the newly created configuration to connect to the selected wifi network.
 sub connect {
-    my ($ssid, $password) = @_;
+    my ($ssid, $password, $config_mode) = @_;
     print "[+] ${BLU}Connecting using configuration for ${YLW}\"$ssid\"${RST}\n";
-    my $result = system("/sbin/ifconfig $INT up");
+    $result = system("/sbin/ifconfig $INT up");
     if ($result != 0) {
-        print STDERR "[!] ${RED}Failed to bring interface up${RST}\n";
+        print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
         exit 1;
     }
-
+    
+    if ($config_mode eq "join") {
+        $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
+    } else {
+        $result = system("/sbin/ifconfig $INT nwid \"$ssid\"");
+    }
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to join wifi network $ssid${RST}\n";
+        exit 1;
+    }
+    
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
-    $result = system("/sbin/ifconfig $INT join \"$ssid\" wpakey \"$password\"");
+    $result = system("/bin/cp \"$conf_file\" /etc/hostname.$INT");
     if ($result != 0) {
-        print STDERR "[!] ${RED}Failed to join wifi network${RST}\n";
+        print STDERR "[!] ${RED}Failed to copy configuration file to /etc/hostname.$INT${RST}\n";
         exit 1;
     }
-
     print "[+] ${BLU}Configured interface ${YLW}$INT${BLU}; ESSID is ${YLW}\"$ssid\"${RST}\n";
-    print "[+] ${BLU}Interface ${YLW}$INT${BLU} is up${RST}\n";
+    
+    # Request a new DHCP lease using dhcpleasectl
+    $result = system("/usr/sbin/dhcpleasectl -w 10 $INT");
+    if ($result != 0) {
+        print STDERR "[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RST}\n";
+        exit 1;
+    }
+    
     $result = system("/usr/sbin/rcctl restart unbound");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
@@ -265,10 +278,8 @@ sub print_banner {
 # --- Main Execution ---
 print_banner();
 
-# Ensure the wifi configuration directory exists with proper permissions.
 unless (-d $WIFI_DIR) {
     make_path($WIFI_DIR, { mode => 0600 }) or die "Cannot create directory $WIFI_DIR: $!";
 }
 
-# Begin by reading saved configurations or creating a new one.
 read_saved();
