@@ -8,8 +8,6 @@ all: install
 
 # Install the script
 install:
-	@echo "Renaming wifi-menu.pl to $(SCRIPT)"
-	mv wifi-menu.pl $(SCRIPT)
 	@echo "Making $(SCRIPT) executable"
 	chmod +x $(SCRIPT)
 	@echo "Installing $(SCRIPT) to $(INSTALL_DIR)"
