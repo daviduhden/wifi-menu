@@ -1,5 +1,9 @@
+# See the LICENSE file at the top of the project tree for copyright
+# and license details.
+
 # Variables
 SCRIPT = wifi-menu
+SCRIPT_SRC = $(SCRIPT).pl
 INSTALL_DIR = /usr/local/bin
 WIFI_DIR = /etc/wifi_saved
 
@@ -7,11 +11,11 @@ WIFI_DIR = /etc/wifi_saved
 all: install
 
 # Install the script
-install:
-	@echo "Making $(SCRIPT) executable"
-	chmod +x $(SCRIPT)
+install: $(SCRIPT_SRC)
+	@echo "Making $(SCRIPT_SRC) executable"
+	chmod +x $(SCRIPT_SRC)
 	@echo "Installing $(SCRIPT) to $(INSTALL_DIR)"
-	install -m 755 $(SCRIPT) $(INSTALL_DIR)/$(SCRIPT)
+	install -m 755 $(SCRIPT_SRC) $(INSTALL_DIR)/$(SCRIPT)
 	@echo "Creating wifi configuration directory $(WIFI_DIR) if it doesn't exist"
 	[ -d $(WIFI_DIR) ] || mkdir -m 700 $(WIFI_DIR)
 
