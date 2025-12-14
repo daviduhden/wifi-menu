@@ -28,12 +28,12 @@ my $CYAN = "\e[36m";
 my $BOLD = "\e[1m";
 my $RESET = "\e[0m";
 
-sub log {
+sub log_info {
     my ($msg) = @_;
     print "${GREEN}✅ [INFO]${RESET} $msg\n";
 }
 
-sub warn {
+sub warn_info {
     my ($msg) = @_;
     print STDERR "${YELLOW}⚠️  [WARN]${RESET} $msg\n";
 }
@@ -44,10 +44,6 @@ sub error {
     print STDERR "${RED}❌ [ERROR]${RESET} $msg\n";
     exit $code;
 }
-
-# Backward-compatible aliases
-sub info     { log(@_); }
-sub warn_msg { warn(@_); }
 
 # --- Global variables ---
 my $INT = $ARGV[0] // '';  # Network interface passed as argument
@@ -81,7 +77,7 @@ sub clear_wireless_settings {
 sub read_saved {
     # Attempt to open the directory containing saved wifi configurations
     unless (opendir(my $dh, $WIFI_DIR)) {
-        warn("No saved wifi configuration directory found; creating $WIFI_DIR");
+        warn_info("No saved wifi configuration directory found; creating $WIFI_DIR");
         make_path($WIFI_DIR, { mode => 0600 });
         return conf_create();
     }
@@ -89,11 +85,11 @@ sub read_saved {
     closedir($dh);
     
     if (!@saved_files) {
-        warn("There are no previously saved wifi connections");
+        warn_info("There are no previously saved wifi connections");
         return conf_create();
     }
     
-    log("Saved wifi configurations:");
+    log_info("Saved wifi configurations:");
     my %file;
     my $i = 1;
     foreach my $f (@saved_files) {
@@ -106,7 +102,7 @@ sub read_saved {
     if (!$choice or !exists $file{$choice}) {
         return conf_create();
     }
-    log("\"$file{$choice}\" is selected");
+    log_info("\"$file{$choice}\" is selected");
     return saved_connect($file{$choice});
 }
 
@@ -119,7 +115,7 @@ sub conf_create {
     }
     # No se mata dhcpleased; en versiones modernas se utiliza dhcpleasectl para renovar el lease.
     
-    log("Scanning for wifi networks on interface $INT...");
+    log_info("Scanning for wifi networks on interface $INT...");
     my $scan_output = `$IFCONFIG $INT scan 2>/dev/null`;
     if ($? != 0) {
         error("Failed to scan for wifi networks on $INT");
@@ -134,7 +130,7 @@ sub conf_create {
         error("No available wifi connections found on interface $INT");
     }
     
-    log("Available wifi networks:");
+    log_info("Available wifi networks:");
     my %list;
     my $i = 1;
     foreach my $net (@networks) {
@@ -145,7 +141,7 @@ sub conf_create {
     print "\nChoose a wifi connection or press Enter to quit: ";
     chomp(my $choice = <STDIN>);
     if (!$choice or !exists $list{$choice}) {
-        warn("Exiting");
+        warn_info("Exiting");
         exit 1;
     }
     my $ssid = $list{$choice};
@@ -183,14 +179,14 @@ EOF
     close($fh);
     chmod 0600, $conf_file or warn "Could not set permissions on $conf_file: $!";
     
-    log("Creating new configuration using \"$ssid\"");
+    log_info("Creating new configuration using \"$ssid\"");
     return connect($ssid, $password, $config_mode);
 }
 
 # --- Subroutine: saved_connect ---
 sub saved_connect {
     my ($conf_file) = @_;
-    log("Connecting using saved configuration file \"$conf_file\"");
+    log_info("Connecting using saved configuration file \"$conf_file\"");
     $result = system("$IFCONFIG $INT up");
     if ($result != 0) {
         error("Failed to bring interface $INT up");
@@ -223,7 +219,7 @@ sub saved_connect {
     if ($result != 0) {
         error("Failed to copy configuration file");
     }
-    log("Configured interface $INT; ESSID is \"$ssid\"");
+    log_info("Configured interface $INT; ESSID is \"$ssid\"");
     
     # Request a new DHCP lease using dhcpleasectl (instead of directly running dhcpleased)
     $result = system("$DHCPCONTROL -w 10 $INT");
@@ -241,7 +237,7 @@ sub saved_connect {
 # --- Subroutine: connect ---
 sub connect {
     my ($ssid, $password, $config_mode) = @_;
-    log("Connecting using configuration for \"$ssid\"");
+    log_info("Connecting using configuration for \"$ssid\"");
     $result = system("$IFCONFIG $INT up");
     if ($result != 0) {
         print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
