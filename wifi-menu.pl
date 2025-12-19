@@ -312,7 +312,7 @@ sub main {
 
     unless ( -d $WIFI_DIR ) {
         make_path( $WIFI_DIR, { mode => 0600 } )
-          or die "Cannot create directory $WIFI_DIR: $!";
+          or die_tool "Cannot create directory $WIFI_DIR: $!";
     }
 
     read_saved();
