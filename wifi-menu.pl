@@ -48,6 +48,50 @@ sub die_tool {
     exit 1;
 }
 
+# --- Wi-Fi interfaces discovery ---
+sub list_wifi_interfaces {
+    my $output = `$IFCONFIG -g wifi 2>/dev/null`;
+    my @ifs;
+
+    foreach my $line ( split /\n/, $output ) {
+        if ( $line =~ /^([\w.-]+):/ ) {
+            push @ifs, $1;
+        }
+    }
+
+    return @ifs;
+}
+
+sub choose_interface {
+    my @ifs = list_wifi_interfaces();
+
+    if ( !@ifs ) {
+        die_tool("No se encontraron interfaces Wi-Fi (grupo 'wifi' en ifconfig)");
+    }
+
+    if ( @ifs == 1 ) {
+        logi("Usando interfaz Wi-Fi detectada: $ifs[0]");
+        return $ifs[0];
+    }
+
+    logi("Interfaces Wi-Fi disponibles:");
+    my %map;
+    my $i = 1;
+    foreach my $iface (@ifs) {
+        print "$i) $iface\n";
+        $map{$i} = $iface;
+        $i++;
+    }
+
+    print "\nElige interfaz (número) o pulsa Enter para cancelar: ";
+    chomp( my $choice = <STDIN> );
+    if ( !$choice || !exists $map{$choice} ) {
+        die_tool("Interfaz no seleccionada");
+    }
+
+    return $map{$choice};
+}
+
 # --- Global variables ---
 my $INT      = $ARGV[0] // '';       # Network interface passed as argument
 my $WIFI_DIR = "/etc/wifi_saved";    # Directory to save wifi configurations
@@ -64,7 +108,7 @@ sub check_root_and_interface {
         loge("This script must be run as root");
     }
     if ( !$INT ) {
-        loge("Usage: doas $0 [interface]");
+        $INT = choose_interface();
     }
 }
 
@@ -125,8 +169,6 @@ sub conf_create {
     if ( $result != 0 ) {
         loge("Failed to bring interface $INT up");
     }
-
-# No se mata dhcpleased; en versiones modernas se utiliza dhcpleasectl para renovar el lease.
 
     logi("Scanning for wifi networks on interface $INT...");
     my $scan_output = `$IFCONFIG $INT scan 2>/dev/null`;
