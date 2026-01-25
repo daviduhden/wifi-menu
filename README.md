@@ -32,7 +32,7 @@ This script helps manage wireless network connections on OpenBSD. It allows you 
 
 3. Run the script:
     ```sh
-    perl wifi-menu <interface>
+    perl wifi-menu
     ```
 
 4. Follow the interactive prompts to apply the desired configurations.
