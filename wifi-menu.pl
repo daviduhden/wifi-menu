@@ -80,8 +80,10 @@ sub clear_wireless_settings {
 # --- Subroutine: read_saved ---
 sub read_saved {
 
+	my $dh;
+
     # Attempt to open the directory containing saved wifi configurations
-    unless ( opendir( my $dh, $WIFI_DIR ) ) {
+    unless ( opendir( $dh, $WIFI_DIR ) ) {
         logw("No saved wifi configuration directory found; creating $WIFI_DIR");
         make_path( $WIFI_DIR, { mode => 0600 } );
         return conf_create();
@@ -249,7 +251,7 @@ sub saved_connect {
 }
 
 # --- Subroutine: connect ---
-sub connect {
+sub wifi_connect {
     my ( $ssid, $password, $config_mode ) = @_;
     my $result;
     logi("Connecting using configuration for \"$ssid\"");
@@ -266,7 +268,7 @@ sub connect {
         $result = system("$IFCONFIG $INT nwid \"$ssid\"");
     }
     if ( $result != 0 ) {
-        print STDERR "[!] ${RED}Failed to join wifi network $ssid${RST}\n";
+        print STDERR "[!] ${RED}Failed to join wifi network $ssid${RESET}\n";
         exit 1;
     }
 
@@ -298,7 +300,7 @@ sub connect {
 
 # Alias to avoid clashing with built-in connect()
 sub connect_wifi {
-    connect(@_);
+    wifi_connect(@_);
 }
 
 # --- Banner ---
