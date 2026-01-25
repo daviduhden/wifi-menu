@@ -26,13 +26,15 @@ my $no_color  = 0;
 my $is_tty    = ( -t STDOUT )             ? 1 : 0;
 my $use_color = ( !$no_color && $is_tty ) ? 1 : 0;
 
-my ( $GREEN, $YELLOW, $RED, $CYAN, $BOLD, $RESET ) = ( "", "", "", "", "", "" );
+my ( $GREEN, $YELLOW, $RED, $CYAN, $BOLD, $GRY, $RESET ) =
+  ( "", "", "", "", "", "", "" );
 if ($use_color) {
     $GREEN  = "\e[32m";
     $YELLOW = "\e[33m";
     $RED    = "\e[31m";
     $CYAN   = "\e[36m";
     $BOLD   = "\e[1m";
+    $GRY    = "\e[90m";
     $RESET  = "\e[0m";
 }
 
@@ -114,6 +116,8 @@ sub read_saved {
 # --- Subroutine: conf_create ---
 sub conf_create {
 
+    my $result;
+
     # Bring the interface up
     $result = system("$IFCONFIG $INT up");
     if ( $result != 0 ) {
@@ -188,14 +192,14 @@ EOF
       or warn "Could not set permissions on $conf_file: $!";
 
     logi("Creating new configuration using \"$ssid\"");
-    return connect( $ssid, $password, $config_mode );
+    return connect_wifi( $ssid, $password, $config_mode );
 }
 
 # --- Subroutine: saved_connect ---
 sub saved_connect {
     my ($conf_file) = @_;
     logi("Connecting using saved configuration file \"$conf_file\"");
-    $result = system("$IFCONFIG $INT up");
+    my $result = system("$IFCONFIG $INT up");
     if ( $result != 0 ) {
         loge("Failed to bring interface $INT up");
     }
@@ -247,10 +251,11 @@ sub saved_connect {
 # --- Subroutine: connect ---
 sub connect {
     my ( $ssid, $password, $config_mode ) = @_;
+    my $result;
     logi("Connecting using configuration for \"$ssid\"");
     $result = system("$IFCONFIG $INT up");
     if ( $result != 0 ) {
-        print STDERR "[!] ${RED}Failed to bring interface $INT up${RST}\n";
+        print STDERR "[!] ${RED}Failed to bring interface $INT up${RESET}\n";
         exit 1;
     }
 
@@ -269,7 +274,7 @@ sub connect {
     $result = system("$CP \"$conf_file\" /etc/hostname.$INT");
     if ( $result != 0 ) {
         print STDERR
-"[!] ${RED}Failed to copy configuration file to /etc/hostname.$INT${RST}\n";
+"[!] ${RED}Failed to copy configuration file to /etc/hostname.$INT${RESET}\n";
         exit 1;
     }
     print
@@ -279,16 +284,21 @@ sub connect {
     $result = system("$DHCPCONTROL -w 10 $INT");
     if ( $result != 0 ) {
         print STDERR
-"[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RST}\n";
+"[!] ${RED}Failed to request DHCP lease on $INT using dhcpleasectl${RESET}\n";
         exit 1;
     }
 
     $result = system("$RCCTL restart unbound");
     if ( $result != 0 ) {
-        print STDERR "[!] ${RED}Failed to restart unbound service${RST}\n";
+        print STDERR "[!] ${RED}Failed to restart unbound service${RESET}\n";
         exit 1;
     }
     exit 0;
+}
+
+# Alias to avoid clashing with built-in connect()
+sub connect_wifi {
+    connect(@_);
 }
 
 # --- Banner ---
