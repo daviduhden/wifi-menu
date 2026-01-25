@@ -60,7 +60,7 @@ our $RCCTL       = "/usr/sbin/rcctl";
 
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
-    my $output = `$IFCONFIG -g wifi 2>/dev/null`;
+    my $output = `$IFCONFIG -g wlan 2>/dev/null`;
     my @ifs;
 
     foreach my $line ( split /\n/, $output ) {
@@ -76,15 +76,15 @@ sub choose_interface {
     my @ifs = list_wifi_interfaces();
 
     if ( !@ifs ) {
-        die_tool("No se encontraron interfaces Wi-Fi (grupo 'wifi' en ifconfig)");
+        die_tool("No Wi-Fi interfaces found (group 'wlan' in ifconfig)");
     }
 
     if ( @ifs == 1 ) {
-        logi("Usando interfaz Wi-Fi detectada: $ifs[0]");
+        logi("Using detected Wi-Fi interface: $ifs[0]");
         return $ifs[0];
     }
 
-    logi("Interfaces Wi-Fi disponibles:");
+    logi("Available Wi-Fi interfaces:");
     my %map;
     my $i = 1;
     foreach my $iface (@ifs) {
@@ -93,10 +93,10 @@ sub choose_interface {
         $i++;
     }
 
-    print "\nElige interfaz (número) o pulsa Enter para cancelar: ";
+    print "\nChoose interface (number) or press Enter to cancel: ";
     chomp( my $choice = <STDIN> );
     if ( !$choice || !exists $map{$choice} ) {
-        die_tool("Interfaz no seleccionada");
+        die_tool("No interface selected");
     }
 
     return $map{$choice};
