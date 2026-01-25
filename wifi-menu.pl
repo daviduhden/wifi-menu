@@ -60,12 +60,22 @@ our $RCCTL       = "/usr/sbin/rcctl";
 
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
-    my $output = `$IFCONFIG -g wlan 2>/dev/null`;
+    my @groups = ( 'wifi', 'wlan' );
+    my %seen;
     my @ifs;
 
-    foreach my $line ( split /\n/, $output ) {
-        if ( $line =~ /^([\w.-]+):/ ) {
-            push @ifs, $1;
+    for my $grp (@groups) {
+        my $output = `$IFCONFIG -g $grp 2>/dev/null`;
+        foreach my $line ( split /\n/, $output ) {
+            if ( $line =~ /^([\w.-]+):/ ) {
+                my $ifc = $1;
+                next if $seen{$ifc};
+                # Validate interface exists/configurable
+                if ( system("$IFCONFIG $ifc >/dev/null 2>&1") == 0 ) {
+                    push @ifs, $ifc;
+                    $seen{$ifc} = 1;
+                }
+            }
         }
     }
 
@@ -76,7 +86,7 @@ sub choose_interface {
     my @ifs = list_wifi_interfaces();
 
     if ( !@ifs ) {
-        die_tool("No Wi-Fi interfaces found (group 'wlan' in ifconfig)");
+        die_tool("No Wi-Fi interfaces found (groups wifi/wlan in ifconfig)");
     }
 
     if ( @ifs == 1 ) {
@@ -102,6 +112,13 @@ sub choose_interface {
     return $map{$choice};
 }
 
+sub ensure_interface_available {
+    my ($ifc) = @_;
+    if ( system("$IFCONFIG $ifc >/dev/null 2>&1") != 0 ) {
+        die_tool("Interface $ifc is not available");
+    }
+}
+
 # --- Check for root privileges and interface argument ---
 sub check_root_and_interface {
     if ( $> != 0 ) {
@@ -110,6 +127,7 @@ sub check_root_and_interface {
     if ( !$INT ) {
         $INT = choose_interface();
     }
+    ensure_interface_available($INT);
 }
 
 # --- Clear wireless settings ---
@@ -178,11 +196,13 @@ sub conf_create {
     my @networks;
     foreach my $line ( split /\n/, $scan_output ) {
         if ( $line =~ /nwid\s+(\S+)/ ) {
-            push @networks, $1;    # Extract network IDs (SSIDs)
+            my $id = $1;
+            next if $id eq '""' || $id eq '"' || $id eq ''; # skip empty SSIDs
+            push @networks, $id;    # Extract network IDs (SSIDs)
         }
     }
     if ( !@networks ) {
-        loge("No available wifi connections found on $INT");
+        loge("No available Wi-Fi connections found on $INT");
     }
 
     logi("Available wifi networks:");
@@ -193,7 +213,7 @@ sub conf_create {
         $list{$i} = $net;    # Map network index to SSID
         $i++;
     }
-    print "\nChoose a wifi connection or press Enter to quit: ";
+    print "\nChoose a Wi-Fi network or press Enter to quit: ";
     chomp( my $choice = <STDIN> );
     if ( !$choice or !exists $list{$choice} ) {
         logw("Exiting");
