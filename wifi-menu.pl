@@ -48,6 +48,16 @@ sub die_tool {
     exit 1;
 }
 
+# --- Global variables ---
+our $INT      = $ARGV[0] // '';       # Network interface passed as argument
+our $WIFI_DIR = "/etc/wifi_saved";    # Directory to save wifi configurations
+
+# --- Binary paths ---
+our $IFCONFIG    = "/sbin/ifconfig";
+our $CP          = "/bin/cp";
+our $DHCPCONTROL = "/usr/sbin/dhcpleasectl";
+our $RCCTL       = "/usr/sbin/rcctl";
+
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
     my $output = `$IFCONFIG -g wifi 2>/dev/null`;
@@ -91,16 +101,6 @@ sub choose_interface {
 
     return $map{$choice};
 }
-
-# --- Global variables ---
-my $INT      = $ARGV[0] // '';       # Network interface passed as argument
-my $WIFI_DIR = "/etc/wifi_saved";    # Directory to save wifi configurations
-
-# --- Binary paths ---
-my $IFCONFIG    = "/sbin/ifconfig";
-my $CP          = "/bin/cp";
-my $DHCPCONTROL = "/usr/sbin/dhcpleasectl";
-my $RCCTL       = "/usr/sbin/rcctl";
 
 # --- Check for root privileges and interface argument ---
 sub check_root_and_interface {
