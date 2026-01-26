@@ -60,11 +60,11 @@ our $RCCTL       = "/usr/sbin/rcctl";
 
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
-    my @groups = ( 'wifi', 'wlan' );
+    my @group = ( 'wlan' );
     my %seen;
     my @ifs;
 
-    for my $grp (@groups) {
+    for my $grp (@group) {
         my $output = `$IFCONFIG -g $grp 2>/dev/null`;
         foreach my $line ( split /\n/, $output ) {
             if ( $line =~ /^([\w.-]+):/ ) {
@@ -87,7 +87,7 @@ sub choose_interface {
     my @ifs = list_wifi_interfaces();
 
     if ( !@ifs ) {
-        die_tool("No Wi-Fi interfaces found (groups wifi/wlan in ifconfig)");
+        die_tool("No Wi-Fi interfaces found (group wlan in ifconfig)");
     }
 
     if ( @ifs == 1 ) {
