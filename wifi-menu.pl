@@ -70,6 +70,7 @@ sub list_wifi_interfaces {
             if ( $line =~ /^([\w.-]+):/ ) {
                 my $ifc = $1;
                 next if $seen{$ifc};
+
                 # Validate interface exists/configurable
                 if ( system("$IFCONFIG $ifc >/dev/null 2>&1") == 0 ) {
                     push @ifs, $ifc;
@@ -142,7 +143,7 @@ sub clear_wireless_settings {
 # --- Subroutine: read_saved ---
 sub read_saved {
 
-	my $dh;
+    my $dh;
 
     # Attempt to open the directory containing saved wifi configurations
     unless ( opendir( $dh, $WIFI_DIR ) ) {
@@ -197,7 +198,7 @@ sub conf_create {
     foreach my $line ( split /\n/, $scan_output ) {
         if ( $line =~ /nwid\s+(\S+)/ ) {
             my $id = $1;
-            next if $id eq '""' || $id eq '"' || $id eq ''; # skip empty SSIDs
+            next if $id eq '""' || $id eq '"' || $id eq '';   # skip empty SSIDs
             push @networks, $id;    # Extract network IDs (SSIDs)
         }
     }
