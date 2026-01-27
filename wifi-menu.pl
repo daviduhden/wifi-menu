@@ -1,18 +1,20 @@
 #!/usr/bin/perl
 
-# Copyright (c) 2025 David Uhden Collado <david@uhden.dev>
+# Interactive Wi-Fi network manager for OpenBSD
 #
-# Permission to use, copy, modify, and distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# Features:
+#  - Lists available Wi-Fi interfaces (if multiple, prompts user to choose)
+#  - Scans for available Wi-Fi networks on the chosen interface
+#  - Allows user to select a network from the scan results
+#  - Prompts for passphrase if the network is secured
+#  - Saves Wi-Fi configurations for future use
+#  - Allows user to select from saved configurations or create new ones
+#  - Configures the network interface and requests DHCP lease
+# Usage:
+#   wifi-menu.pl [interface]
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# See the LICENSE file at the top of the project tree for copyright
+# and license details.
 
 use strict;
 use warnings;
