@@ -62,7 +62,7 @@ our $RCCTL       = "/usr/sbin/rcctl";
 
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
-    my @group = ( 'wlan' );
+    my @group = ('wlan');
     my %seen;
     my @ifs;
 
