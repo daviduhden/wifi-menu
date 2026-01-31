@@ -11,7 +11,7 @@
 #  - Allows user to select from saved configurations or create new ones
 #  - Configures the network interface and requests DHCP lease
 # Usage:
-#   wifi-menu.pl [interface]
+#   wifi-menu.pl
 #
 # See the LICENSE file at the top of the project tree for copyright
 # and license details.
@@ -51,7 +51,7 @@ sub die_tool {
 }
 
 # --- Global variables ---
-our $INT      = $ARGV[0] // '';       # Network interface passed as argument
+our $INT      = '';                   # Interface selected interactively
 our $WIFI_DIR = "/etc/wifi_saved";    # Directory to save wifi configurations
 
 # --- Binary paths ---
@@ -127,9 +127,7 @@ sub check_root_and_interface {
     if ( $> != 0 ) {
         loge("This script must be run as root");
     }
-    if ( !$INT ) {
-        $INT = choose_interface();
-    }
+    $INT = choose_interface();
     ensure_interface_available($INT);
 }
 
