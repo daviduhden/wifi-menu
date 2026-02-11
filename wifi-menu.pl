@@ -60,6 +60,40 @@ our $CP          = "/bin/cp";
 our $DHCPCONTROL = "/usr/sbin/dhcpleasectl";
 our $RCCTL       = "/usr/sbin/rcctl";
 
+sub setup_sandbox {
+    my ($ifc) = @_;
+    return unless $^O eq 'openbsd';
+
+    eval {
+        require OpenBSD::Pledge;
+        require OpenBSD::Unveil;
+
+        my @rx_paths  = ( $IFCONFIG, $CP, $DHCPCONTROL, $RCCTL, '/bin/sh' );
+        my @r_paths   = ( '/etc', '/dev' );
+        my @rwc_paths = ( $WIFI_DIR, '/tmp' );
+
+        for my $p (@rx_paths) {
+            OpenBSD::Unveil::unveil( $p, 'rx' );
+        }
+        for my $p (@r_paths) {
+            OpenBSD::Unveil::unveil( $p, 'r' );
+        }
+        for my $p (@rwc_paths) {
+            OpenBSD::Unveil::unveil( $p, 'rwc' );
+        }
+        if ( defined $ifc && length $ifc ) {
+            OpenBSD::Unveil::unveil( "/etc/hostname.$ifc", 'rwc' );
+        }
+
+        OpenBSD::Unveil::unveil();
+        OpenBSD::Pledge::pledge('stdio rpath wpath cpath fattr proc exec unix')
+          or die "pledge failed";
+        1;
+    } or do {
+        logw("OpenBSD pledge/unveil setup failed: $@");
+    };
+}
+
 # --- Wi-Fi interfaces discovery ---
 sub list_wifi_interfaces {
     my @group = ('wlan');
@@ -383,13 +417,14 @@ sub print_banner {
 sub main {
     print_banner();
     check_root_and_interface();
-    clear_wireless_settings();
 
     unless ( -d $WIFI_DIR ) {
         make_path( $WIFI_DIR, { mode => 0600 } )
           or die_tool "Cannot create directory $WIFI_DIR: $!";
     }
 
+    setup_sandbox($INT);
+    clear_wireless_settings();
     read_saved();
 }
 
