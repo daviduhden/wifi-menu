@@ -82,6 +82,7 @@ sub setup_sandbox {
         for my $p (@rwc_paths) {
             OpenBSD::Unveil::unveil( $p, 'rwc' );
         }
+        OpenBSD::Unveil::unveil( '/dev/null', 'rw' );
         if ( defined $ifc && length $ifc ) {
             OpenBSD::Unveil::unveil( "/etc/hostname.$ifc", 'rwc' );
         }
