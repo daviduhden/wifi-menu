@@ -27,12 +27,12 @@ This script helps manage wireless network connections on OpenBSD. It allows you 
 
 2. Make the script executable:
     ```sh
-    chmod +x wifi-menu
+    chmod +x wifi-menu.pl
     ```
 
 3. Run the script:
     ```sh
-    perl wifi-menu
+    perl wifi-menu.pl
     ```
 
 4. Follow the interactive questions to apply the desired configurations.
