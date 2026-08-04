@@ -50,7 +50,7 @@ sub die_tool {
 
 # --- Global variables ---
 our $INT      = '';                   # Interface selected interactively
-our $WIFI_DIR = "/etc/wifi_saved";   # Dir to save wifi configs
+our $WIFI_DIR = "/etc/wifi_saved";    # Dir to save wifi configs
 
 # --- Binary paths ---
 our $IFCONFIG    = "/sbin/ifconfig";
@@ -88,8 +88,7 @@ sub setup_sandbox {
         }
 
         OpenBSD::Unveil::unveil();
-        OpenBSD::Pledge::pledge(
-            'stdio rpath wpath cpath fattr proc exec unix')
+        OpenBSD::Pledge::pledge('stdio rpath wpath cpath fattr proc exec unix')
           or die "pledge failed";
         1;
     } or do {
@@ -174,8 +173,7 @@ sub check_root_and_interface {
     while (1) {
         my @ifs = list_wifi_interfaces();
         if ( !@ifs ) {
-            die_tool(
-                "No Wi-Fi interfaces found (group wlan in ifconfig)");
+            die_tool("No Wi-Fi interfaces found (group wlan in ifconfig)");
         }
 
         my @ordered;
@@ -198,16 +196,14 @@ sub check_root_and_interface {
             return;
         }
 
-        logw(
-            "No Wi-Fi interfaces could be brought up; choose another.");
+        logw("No Wi-Fi interfaces could be brought up; choose another.");
     }
 }
 
 # --- Clear existing wireless settings before reconfigure ---
 sub clear_wireless_settings {
     my $clr =
-      "$IFCONFIG $INT -inet6 -inet -bssid -chan"
-      . " -nwid -nwkey -wpa -wpakey";
+      "$IFCONFIG $INT -inet6 -inet -bssid -chan" . " -nwid -nwkey -wpa -wpakey";
     my $result = system($clr);
     if ( $result != 0 ) {
         loge("Failed to clear wireless settings on $INT");
@@ -221,9 +217,8 @@ sub read_saved {
 
     # Attempt to open directory containing saved Wi-Fi configs.
     unless ( opendir( $dh, $WIFI_DIR ) ) {
-        logw(
-            "No saved wifi configuration directory found;"
-              . " creating $WIFI_DIR");
+        logw(   "No saved wifi configuration directory found;"
+              . " creating $WIFI_DIR" );
         make_path( $WIFI_DIR, { mode => 0600 } );
         return conf_create();
     }
@@ -244,8 +239,7 @@ sub read_saved {
         $file{$i} = $f;    # Map file index to file name
         $i++;
     }
-    print
-"\nChoose a saved wifi connection or press Enter to create new: ";
+    print "\nChoose a saved wifi connection or press Enter to create new: ";
     chomp( my $choice = <STDIN> );
     if ( !$choice or !exists $file{$choice} ) {
         return conf_create();
@@ -298,16 +292,13 @@ sub conf_create {
         exit 1;
     }
     my $ssid = $list{$choice};
-    print "Enter passphrase for \"$ssid\""
-      . " (leave empty if open network): ";
+    print "Enter passphrase for \"$ssid\"" . " (leave empty if open network): ";
     ReadMode('noecho');
     chomp( my $password = <STDIN> );
     ReadMode('restore');
     print "\n";
     if ( length($password) > 0 && length($password) < 8 ) {
-        loge(
-            "Passphrase must be 8-63 chars for WPA networks"
-        );
+        loge("Passphrase must be 8-63 chars for WPA networks");
     }
 
     print "\nConfigure Host-based Access Point mode? (y/N): ";
@@ -319,8 +310,7 @@ sub conf_create {
 
     # Use "join" for WPA networks, otherwise "nwid" for open networks.
     my $config_mode = ( length($password) > 0 ) ? "join" : "nwid";
-    my $wpa_line =
-      ( length($password) > 0 ) ? " wpakey \"$password\"" : "";
+    my $wpa_line    = ( length($password) > 0 ) ? " wpakey \"$password\"" : "";
 
     my $config = <<"EOF";
 $config_mode "$ssid"$wpa_line
@@ -354,9 +344,7 @@ sub saved_connect {
     open( my $fh, '<', "$WIFI_DIR/$conf_file" )
       or loge("Cannot open $WIFI_DIR/$conf_file: $!");
     while ( my $line = <$fh> ) {
-        if ( $line =~
-            /^(join|nwid)\s+"([^"]+)"(?:\s+wpakey\s+"([^"]+)")?/ )
-        {
+        if ( $line =~ /^(join|nwid)\s+"([^"]+)"(?:\s+wpakey\s+"([^"]+)")?/ ) {
             $mode   = $1;
             $ssid   = $2;
             $wpakey = $3;    # may be undefined for open networks
@@ -416,36 +404,32 @@ sub wifi_connect {
         $result = system("$IFCONFIG $INT nwid \"$ssid\"");
     }
     if ( $result != 0 ) {
-        print STDERR
-          "[!] ${RED}Failed to join wifi network $ssid${RESET}\n";
+        print STDERR "[!] ${RED}Failed to join wifi network $ssid${RESET}\n";
         exit 1;
     }
 
     my $conf_file = "$WIFI_DIR/$ssid.$INT";
     $result = system("$CP \"$conf_file\" /etc/hostname.$INT");
     if ( $result != 0 ) {
-        print STDERR
-          "[!] ${RED}Failed to copy config to"
+        print STDERR "[!] ${RED}Failed to copy config to"
           . " /etc/hostname.$INT${RESET}\n";
         exit 1;
     }
-    print
-      "[+] ${CYAN}Configured interface ${YELLOW}$INT${CYAN};"
+    print "[+] ${CYAN}Configured interface ${YELLOW}$INT${CYAN};"
       . " ESSID is ${YELLOW}\"$ssid\"${RESET}\n";
 
     # Request a new DHCP lease using dhcpleasectl.
     $result = system("$DHCPCONTROL -w 10 $INT");
     if ( $result != 0 ) {
         print STDERR
-"[!] ${RED}Failed to request DHCP lease via dhcpleasectl${RESET}\n";
+          "[!] ${RED}Failed to request DHCP lease via dhcpleasectl${RESET}\n";
         exit 1;
     }
     ensure_default_route($INT);
 
     $result = system("$RCCTL restart unbound");
     if ( $result != 0 ) {
-        print STDERR
-          "[!] ${RED}Failed to restart unbound${RESET}\n";
+        print STDERR "[!] ${RED}Failed to restart unbound${RESET}\n";
         exit 1;
     }
     exit 0;
@@ -459,9 +443,8 @@ sub connect_wifi {
 # --- Banner ---
 sub print_banner {
     print "\n$GREEN   .;'                     `;,            \n";
-    print
-"$GREEN  .;'  ,;'             `;,  `;,  "
-  . "  OpenBSD wireless network manager\n";
+    print "$GREEN  .;'  ,;'             `;,  `;,  "
+      . "  OpenBSD wireless network manager\n";
     print "$GREEN .;'  ,;'  ,;'     `;,  `;,  `;,        \n";
     print "$GREEN ::   ::   :   $GRY( ) $GREEN  :   ::   ::   \n";
     print "$GREEN ':.  ':.  ':. $GRY/_\\ $GREEN,:'  ,:'  ,:'  \n";
