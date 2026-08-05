@@ -8,12 +8,12 @@ use warnings;
 use File::Copy qw(copy);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
-use POSIX qw(ECHO TCSANOW);
+use POSIX      qw(ECHO TCSANOW);
 
-my $WIFI_DIR   = '/etc/wifi_saved';
-my $IFCONFIG   = '/sbin/ifconfig';
+my $WIFI_DIR    = '/etc/wifi_saved';
+my $IFCONFIG    = '/sbin/ifconfig';
 my $DHCPCONTROL = '/usr/sbin/dhcpleasectl';
-my $INT        = '';
+my $INT         = '';
 
 my $is_tty = -t STDOUT;
 my ( $GREEN, $YELLOW, $RED, $RESET ) = ( '', '', '', '' );
@@ -24,6 +24,7 @@ if ($is_tty) {
 
 sub logi { print "${GREEN}[INFO]${RESET} $_[0]\n" }
 sub logw { print STDERR "${YELLOW}[WARN]${RESET} $_[0]\n" }
+
 sub die_tool {
     print STDERR "${RED}[ERROR]${RESET} $_[0]\n";
     exit 1;
@@ -41,7 +42,7 @@ sub capture {
       or die_tool("Cannot execute $command[0]: $!");
     local $/;
     my $output = <$fh> // '';
-    my $ok = close $fh;
+    my $ok     = close $fh;
     return ( $ok, $output );
 }
 
@@ -73,7 +74,8 @@ sub setup_sandbox {
         "/etc/.hostname.$INT.wifi-menu.$$",
         "/etc/.hostname.$INT.wifi-menu-backup.$$",
         "/etc/hostname.$INT.wifi-menu.old"
-      ) {
+      )
+    {
         OpenBSD::Unveil::unveil( $path, 'rwc' )
           or die_tool("unveil($path) failed: $!");
     }
@@ -129,9 +131,11 @@ sub select_interface {
 }
 
 sub clear_wireless_settings {
-    run( $IFCONFIG, $INT, '-bssid', '-chan', '-nwid', '-nwkey',
-        '-wpa', '-wpakey', '-joinlist' )
-      or die_tool("Failed to clear wireless settings on $INT");
+    run(
+        $IFCONFIG, $INT,     '-bssid', '-chan',
+        '-nwid',   '-nwkey', '-wpa',   '-wpakey',
+        '-joinlist'
+    ) or die_tool("Failed to clear wireless settings on $INT");
 }
 
 # ifconfig(8) prints printable SSIDs verbatim, quotes those containing
@@ -182,7 +186,7 @@ sub read_password {
           or die "$!\n";
         1;
     }
-      or die_tool("Cannot read terminal settings: " . ( $@ || $! ));
+      or die_tool( "Cannot read terminal settings: " . ( $@ || $! ) );
     my $original_lflag = $termios->getlflag();
     $termios->setlflag( $original_lflag & ~ECHO );
     eval {
@@ -190,7 +194,7 @@ sub read_password {
           or die "$!\n";
         1;
     }
-      or die_tool("Cannot disable terminal echo: " . ( $@ || $! ));
+      or die_tool( "Cannot disable terminal echo: " . ( $@ || $! ) );
 
     my ( $password, $read_error, $restore_error );
     eval {
@@ -215,16 +219,18 @@ sub read_password {
     if ( length $password ) {
         die_tool('A WPA passphrase must contain between 8 and 63 characters')
           unless length($password) >= 8 && length($password) <= 63;
-        die_tool('Double quotes, backslashes, # and line breaks are not supported in saved passphrases')
-          if $password =~ /["\\#\r\n]/;
+        die_tool(
+'Double quotes, backslashes, # and line breaks are not supported in saved passphrases'
+        ) if $password =~ /["\\#\r\n]/;
     }
     return $password;
 }
 
 sub hostname_arg {
     my ($value) = @_;
-    die_tool('A saved value cannot contain double quotes, backslashes, # or line breaks')
-      if $value =~ /["\\#\r\n]/;
+    die_tool(
+'A saved value cannot contain double quotes, backslashes, # or line breaks'
+    ) if $value =~ /["\\#\r\n]/;
     return $value =~ /[[:space:]']/ ? qq{"$value"} : $value;
 }
 
@@ -235,14 +241,17 @@ sub config_path {
 
 sub write_config {
     my ( $ssid, $password ) = @_;
-    my $path = config_path($ssid);
+    my $path       = config_path($ssid);
     my $ssid_field = hostname_arg($ssid);
-    my $line = "join $ssid_field";
+    my $line       = "join $ssid_field";
     $line .= ' wpakey ' . hostname_arg($password) if length $password;
     my $content = "$line\ninet autoconf\n";
 
-    my ( $fh, $temporary ) = tempfile( '.wifi-menu-XXXXXX', DIR => $WIFI_DIR,
-        UNLINK => 0 );
+    my ( $fh, $temporary ) = tempfile(
+        '.wifi-menu-XXXXXX',
+        DIR    => $WIFI_DIR,
+        UNLINK => 0
+    );
     chmod 0600, $temporary
       or die_tool("Cannot protect $temporary: $!");
     print {$fh} $content
@@ -262,16 +271,16 @@ sub parse_saved_config {
     my $field = qr/(?:"([^"]*)"|(\S+))/;
     $line =~ /\Ajoin\s+$field(?:\s+wpakey\s+$field)?\s*\z/
       or die_tool("Invalid saved configuration: $path");
-    my $ssid = defined $1 ? $1 : $2;
+    my $ssid     = defined $1 ? $1 : $2;
     my $password = defined $3 ? $3 : defined $4 ? $4 : '';
     return ( $ssid, $password );
 }
 
 sub install_hostname_file {
-    my ($source) = @_;
-    my $destination = "/etc/hostname.$INT";
-    my $temporary = "/etc/.hostname.$INT.wifi-menu.$$";
-    my $backup = "$destination.wifi-menu.old";
+    my ($source)         = @_;
+    my $destination      = "/etc/hostname.$INT";
+    my $temporary        = "/etc/.hostname.$INT.wifi-menu.$$";
+    my $backup           = "$destination.wifi-menu.old";
     my $backup_temporary = "/etc/.hostname.$INT.wifi-menu-backup.$$";
 
     if ( -e $destination ) {
@@ -328,18 +337,17 @@ sub apply_connection {
 }
 
 sub create_connection {
-    my $network = choose_network( scan_networks() );
+    my $network  = choose_network( scan_networks() );
     my $password = read_password( $network->{display} );
-    my $config = write_config( $network->{ssid}, $password );
+    my $config   = write_config( $network->{ssid}, $password );
     apply_connection( $network->{ssid}, $password, $config );
 }
 
 sub saved_connections {
     opendir my $dh, $WIFI_DIR
       or die_tool("Cannot open $WIFI_DIR: $!");
-    my @files = sort grep {
-        /\A[0-9a-f]+\.\Q$INT\E\z/ && -f "$WIFI_DIR/$_"
-    } readdir $dh;
+    my @files =
+      sort grep { /\A[0-9a-f]+\.\Q$INT\E\z/ && -f "$WIFI_DIR/$_" } readdir $dh;
     closedir $dh;
     return @files;
 }
