@@ -15,18 +15,11 @@ my $IFCONFIG    = '/sbin/ifconfig';
 my $DHCPCONTROL = '/usr/sbin/dhcpleasectl';
 my $INT         = '';
 
-my $is_tty = -t STDOUT;
-my ( $GREEN, $YELLOW, $RED, $RESET ) = ( '', '', '', '' );
-if ($is_tty) {
-    ( $GREEN, $YELLOW, $RED, $RESET ) =
-      ( "\e[32m", "\e[33m", "\e[31m", "\e[0m" );
-}
-
-sub logi { print "${GREEN}[INFO]${RESET} $_[0]\n" }
-sub logw { print STDERR "${YELLOW}[WARN]${RESET} $_[0]\n" }
+sub logi { print "[INFO] $_[0]\n" }
+sub logw { print STDERR "[WARN] $_[0]\n" }
 
 sub die_tool {
-    print STDERR "${RED}[ERROR]${RESET} $_[0]\n";
+    print STDERR "[ERROR] $_[0]\n";
     exit 1;
 }
 
