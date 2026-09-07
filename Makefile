@@ -4,7 +4,7 @@
 # Variables
 SCRIPT = wifi-menu
 SCRIPT_SRC = $(SCRIPT).pl
-SCRIPT_PATH = ${.PARSEDIR}/${SCRIPT_SRC}
+SCRIPT_PATH = ${SCRIPT_SRC}
 INSTALL_DIR = /usr/local/bin
 WIFI_DIR = /etc/wifi_saved
 INFO = ==>
