@@ -65,14 +65,10 @@ sub setup_sandbox {
         OpenBSD::Unveil::unveil( $path, 'rx' )
           or die_tool("unveil($path) failed: $!");
     }
+
     # /dev/urandom is read when Perl seeds the random names used by
     # File::Temp; unveiling it avoids falling back to weaker sources.
-    for my $path (
-        '/usr/lib',
-        '/var/run/ld.so.hints',
-        '/dev/urandom'
-      )
-    {
+    for my $path ( '/usr/lib', '/var/run/ld.so.hints', '/dev/urandom' ) {
         next unless -e $path;
         OpenBSD::Unveil::unveil( $path, 'r' )
           or die_tool("unveil($path) failed: $!");
@@ -159,6 +155,7 @@ sub scan_networks {
     my %seen;
     my @networks;
     for my $line ( split /\n/, $output ) {
+
         # Scan results are indented "nwid <ssid> chan <n> ..." lines.
         # Anchoring on the leading whitespace stops the interface status
         # line that precedes the results, and matching a quoted SSID as
@@ -235,8 +232,8 @@ sub read_password {
         die_tool('A WPA passphrase must contain between 8 and 63 characters')
           unless length($password) >= 8 && length($password) <= 63;
         die_tool(
-'Line breaks and NUL bytes are not supported in saved passphrases'
-        ) if $password =~ /[\r\n\0]/;
+            'Line breaks and NUL bytes are not supported in saved passphrases')
+          if $password =~ /[\r\n\0]/;
     }
     return $password;
 }
@@ -257,7 +254,7 @@ sub hostname_arg {
 # bare and double-quoted formats written by older versions.
 sub unquote_hn_field {
     my ($field) = @_;
-    return $1 if $field =~ /\A"([^"]*)"\z/s;
+    return $1 if $field         =~ /\A"([^"]*)"\z/s;
     return $field unless $field =~ /\A'/;
     my $sep = "'\\''";
     $field =~ s/\A'//;
@@ -394,6 +391,7 @@ sub choose_saved_or_new {
     logi('Saved Wi-Fi configurations:');
     for my $i ( 0 .. $#files ) {
         my ($hex) = split /\./, $files[$i], 2;
+
         # Only decode well-formed hexadecimal, and never warn about a
         # stray file that happens to match the filename pattern.
         my $valid = $hex =~ /\A(?:[0-9a-f]{2})+\z/;
