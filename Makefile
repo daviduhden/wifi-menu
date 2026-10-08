@@ -4,18 +4,21 @@
 # Variables
 SCRIPT = wifi-menu
 SCRIPT_SRC = $(SCRIPT).pl
-SCRIPT_PATH = ${SCRIPT_SRC}
-INSTALL_DIR = /usr/local/bin
-WIFI_DIR = /etc/wifi_saved
+PREFIX ?= /usr/local
+INSTALL_DIR ?= $(PREFIX)/bin
+WIFI_DIR ?= /etc/wifi_saved
 INFO = ==>
 
 # Default target
 all: install
 
 # Install the script
-install: $(SCRIPT_PATH)
-	@echo "$(INFO) Installing $(SCRIPT) -> $(INSTALL_DIR)/$(SCRIPT)" && install -m 755 $(SCRIPT_PATH) $(INSTALL_DIR)/$(SCRIPT)
-	@echo "$(INFO) Ensuring wifi directory $(WIFI_DIR) exists" && [ -d $(WIFI_DIR) ] || mkdir -m 700 $(WIFI_DIR)
+install: $(SCRIPT_SRC)
+	@echo "$(INFO) Installing $(SCRIPT) -> $(INSTALL_DIR)/$(SCRIPT)"
+	@install -d -m 755 $(INSTALL_DIR)
+	@install -m 755 $(SCRIPT_SRC) $(INSTALL_DIR)/$(SCRIPT)
+	@echo "$(INFO) Ensuring wifi directory $(WIFI_DIR) exists"
+	@[ -d $(WIFI_DIR) ] || mkdir -m 700 $(WIFI_DIR)
 	@chmod 700 $(WIFI_DIR)
 	@echo "$(INFO) Install complete"
 
@@ -38,9 +41,11 @@ clean:
 
 # Display help
 help:
-	@printf "Usage:\n  make all        - Install the script\n  make install    - Install the script\n  make uninstall  - Uninstall and preserve saved credentials\n  make purge      - Uninstall and remove saved credentials\n  make clean      - Clean up temporary files\n  make help       - Display this help message\n"
+	@printf "Usage:\n  make all        - Install the script\n  make install    - Install the script\n  make uninstall  - Uninstall and preserve saved credentials\n  make purge      - Uninstall and remove saved credentials\n  make test       - Check the Perl script syntax\n  make clean      - Clean up temporary files\n  make help       - Display this help message\n"
 
+# Static check: verify that the script compiles.
 test:
-	@echo "$(INFO) No automated tests defined"
+	@echo "$(INFO) Checking $(SCRIPT_SRC) syntax"
+	@perl -c $(SCRIPT_SRC)
 
 .PHONY: all install uninstall purge clean help test

@@ -1,6 +1,6 @@
 # OpenBSD Wi-Fi Menu
 
-`wifi-menu` is an interactive client-mode Wi-Fi configurator for OpenBSD. It discovers interfaces in the `wlan` interface group, shows the result of `ifconfig interface scan`, creates a protected `hostname.if(5)` file and asks `dhcpleased(8)` to obtain the IPv4 lease.
+`wifi-menu` is an interactive client-mode Wi-Fi configurator for OpenBSD. It discovers interfaces in the `wlan` interface group, scans with `ifconfig interface scan`, shows the discovered networks, creates a protected `hostname.if(5)` file and asks `dhcpleased(8)` to obtain the IPv4 lease.
 
 It does not configure a Host AP, restart a local resolver, invent a default route or randomize the MAC address. Those operations require separate policy and, in the case of an access point, address assignment, forwarding, DHCP and firewall configuration.
 
@@ -27,9 +27,9 @@ The program:
 
 An existing interface file is copied to `/etc/hostname.interface.wifi-menu.old` immediately before replacement. Saved entries and that backup contain the WPA passphrase in clear text because that is the format consumed by `netstart(8)`. The directory is mode 0700 and credential files are mode 0600; backups and access to them must be treated as secrets.
 
-Printable SSIDs, SSIDs with spaces and the hexadecimal representation emitted by `ifconfig` are supported. For an unambiguous `hostname.if` file, line breaks, double quotes, backslashes and `#` are rejected in saved SSIDs/passphrases. WPA passphrases must contain 8–63 characters.
+Printable SSIDs, SSIDs with spaces and the hexadecimal representation emitted by `ifconfig` are supported. Values written to `hostname.if(5)` are enclosed in single quotes with embedded single quotes encoded as `'\''`, so shell metacharacters in an SSID or passphrase cannot be interpreted when `netstart(8)` evaluates the file; line breaks and NUL bytes are rejected. WPA passphrases must contain 8–63 characters.
 
-On OpenBSD, the Perl orchestration process locks an `unveil(2)` view and applies `pledge(2)` after choosing the interface. The Perl binding does not set `execpromises`, so each executed base-system utility starts with its own pledge state while retaining the narrowed unveil view; `ifconfig` and `dhcpleasectl` can then apply their native security policy. Failure to install either launcher restriction is fatal.
+On OpenBSD, the Perl orchestration process locks an `unveil(2)` view and applies `pledge(2)` after choosing the interface. The Perl binding does not set `execpromises`, so `execve(2)` clears the inherited restrictions: each executed base-system utility starts with a fresh pledge state and filesystem view and then applies its own security policy. The `unveil(2)` view and `pledge(2)` promises still constrain every file operation performed by the Perl process itself. Failure to install either launcher restriction is fatal.
 
 ## Removal
 

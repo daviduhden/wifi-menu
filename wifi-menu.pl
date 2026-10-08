@@ -43,6 +43,17 @@ sub require_root {
     die_tool('This script must be run as root') if $> != 0;
 }
 
+# Read one line from the terminal, returning '' at end of input and
+# discarding the surrounding whitespace so that stray spaces or tabs do
+# not turn a valid choice into an invalid one.
+sub read_choice {
+    my $line = <STDIN>;
+    return '' unless defined $line;
+    $line =~ s/\A\s+//;
+    $line =~ s/\s+\z//;
+    return $line;
+}
+
 sub setup_sandbox {
     return unless $^O eq 'openbsd';
 
@@ -54,7 +65,14 @@ sub setup_sandbox {
         OpenBSD::Unveil::unveil( $path, 'rx' )
           or die_tool("unveil($path) failed: $!");
     }
-    for my $path ( '/usr/lib', '/var/run/ld.so.hints' ) {
+    # /dev/urandom is read when Perl seeds the random names used by
+    # File::Temp; unveiling it avoids falling back to weaker sources.
+    for my $path (
+        '/usr/lib',
+        '/var/run/ld.so.hints',
+        '/dev/urandom'
+      )
+    {
         next unless -e $path;
         OpenBSD::Unveil::unveil( $path, 'r' )
           or die_tool("unveil($path) failed: $!");
@@ -109,7 +127,7 @@ sub choose_interface {
         printf "%d) %s\n", $i + 1, $interfaces[$i];
     }
     print "\nChoose interface (number) or press Enter to cancel: ";
-    chomp( my $choice = <STDIN> // '' );
+    my $choice = read_choice();
     return if $choice eq '';
     die_tool('Invalid interface selection')
       unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @interfaces;
@@ -141,7 +159,11 @@ sub scan_networks {
     my %seen;
     my @networks;
     for my $line ( split /\n/, $output ) {
-        next unless $line =~ /\bnwid\s+(.+?)\s+chan\s+/;
+        # Scan results are indented "nwid <ssid> chan <n> ..." lines.
+        # Anchoring on the leading whitespace stops the interface status
+        # line that precedes the results, and matching a quoted SSID as
+        # a unit stops an SSID containing " chan " from being split.
+        next unless $line =~ /^\s*nwid\s+("[^"]*"|\S+)\s+chan\s+/;
         my $printed = $1;
         next if $printed eq '""';
         my $ssid = $printed;
@@ -161,7 +183,7 @@ sub choose_network {
         printf "%d) %s\n", $i + 1, $networks[$i]{display};
     }
     print "\nChoose a Wi-Fi network or press Enter to quit: ";
-    chomp( my $choice = <STDIN> // '' );
+    my $choice = read_choice();
     exit 0 if $choice eq '';
     die_tool('Invalid network selection')
       unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @networks;
@@ -213,18 +235,35 @@ sub read_password {
         die_tool('A WPA passphrase must contain between 8 and 63 characters')
           unless length($password) >= 8 && length($password) <= 63;
         die_tool(
-'Double quotes, backslashes, # and line breaks are not supported in saved passphrases'
-        ) if $password =~ /["\\#\r\n]/;
+'Line breaks and NUL bytes are not supported in saved passphrases'
+        ) if $password =~ /[\r\n\0]/;
     }
     return $password;
 }
 
 sub hostname_arg {
     my ($value) = @_;
-    die_tool(
-'A saved value cannot contain double quotes, backslashes, # or line breaks'
-    ) if $value =~ /["\\#\r\n]/;
-    return $value =~ /[[:space:]']/ ? qq{"$value"} : $value;
+
+    # netstart(8) evaluates every hostname.if(5) line with the shell, so
+    # a bare word could run a command or be mangled.  Wrap the value in
+    # single quotes and encode each embedded single quote as '\''.
+    die_tool('A saved value cannot contain line breaks or NUL bytes')
+      if $value =~ /[\r\n\0]/;
+    my @parts = split /'/, $value, -1;
+    return "'" . join( "'\\''", @parts ) . "'";
+}
+
+# Decode a field produced by hostname_arg(), while still accepting the
+# bare and double-quoted formats written by older versions.
+sub unquote_hn_field {
+    my ($field) = @_;
+    return $1 if $field =~ /\A"([^"]*)"\z/s;
+    return $field unless $field =~ /\A'/;
+    my $sep = "'\\''";
+    $field =~ s/\A'//;
+    $field =~ s/'\z//;
+    $field =~ s/\Q$sep\E/'/g;
+    return $field;
 }
 
 sub config_path {
@@ -240,10 +279,12 @@ sub write_config {
     $line .= ' wpakey ' . hostname_arg($password) if length $password;
     my $content = "$line\ninet autoconf\n";
 
+    # UNLINK removes the staging file if the write fails; after the
+    # successful rename the recorded name no longer exists.
     my ( $fh, $temporary ) = tempfile(
         '.wifi-menu-XXXXXX',
         DIR    => $WIFI_DIR,
-        UNLINK => 0
+        UNLINK => 1
     );
     chmod 0600, $temporary
       or die_tool("Cannot protect $temporary: $!");
@@ -261,11 +302,12 @@ sub parse_saved_config {
     my $line = <$fh> // '';
     close $fh or die_tool("Cannot close $path: $!");
 
-    my $field = qr/(?:"([^"]*)"|(\S+))/;
-    $line =~ /\Ajoin\s+$field(?:\s+wpakey\s+$field)?\s*\z/
+    my $single = qr/'[^']*(?:'\\''[^']*)*'/;
+    my $field  = qr/$single|"[^"]*"|\S+/;
+    $line =~ /\Ajoin\s+($field)(?:\s+wpakey\s+($field))?\s*\z/
       or die_tool("Invalid saved configuration: $path");
-    my $ssid     = defined $1 ? $1 : $2;
-    my $password = defined $3 ? $3 : defined $4 ? $4 : '';
+    my $ssid     = unquote_hn_field($1);
+    my $password = defined $2 ? unquote_hn_field($2) : '';
     return ( $ssid, $password );
 }
 
@@ -352,11 +394,14 @@ sub choose_saved_or_new {
     logi('Saved Wi-Fi configurations:');
     for my $i ( 0 .. $#files ) {
         my ($hex) = split /\./, $files[$i], 2;
-        my $label = pack( 'H*', $hex );
+        # Only decode well-formed hexadecimal, and never warn about a
+        # stray file that happens to match the filename pattern.
+        my $valid = $hex =~ /\A(?:[0-9a-f]{2})+\z/;
+        my $label = $valid ? pack( 'H*', $hex ) : $files[$i];
         printf "%d) %s\n", $i + 1, $label;
     }
     print "\nChoose a saved network or press Enter to scan: ";
-    chomp( my $choice = <STDIN> // '' );
+    my $choice = read_choice();
     return create_connection() if $choice eq '';
     die_tool('Invalid saved-network selection')
       unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @files;
