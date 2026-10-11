@@ -33,7 +33,7 @@ sub capture {
     my (@command) = @_;
     open my $fh, '-|', @command
       or die_tool("Cannot execute $command[0]: $!");
-    local $/;
+    local $/ = undef;
     my $output = <$fh> // '';
     my $ok     = close $fh;
     return ( $ok, $output );
@@ -126,7 +126,7 @@ sub choose_interface {
     my $choice = read_choice();
     return if $choice eq '';
     die_tool('Invalid interface selection')
-      unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @interfaces;
+      if $choice !~ /\A[1-9][0-9]*\z/ || $choice > @interfaces;
     return $interfaces[ $choice - 1 ];
 }
 
@@ -183,7 +183,7 @@ sub choose_network {
     my $choice = read_choice();
     exit 0 if $choice eq '';
     die_tool('Invalid network selection')
-      unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @networks;
+      if $choice !~ /\A[1-9][0-9]*\z/ || $choice > @networks;
     return $networks[ $choice - 1 ];
 }
 
@@ -214,14 +214,14 @@ sub read_password {
         local $SIG{TERM} = sub { die "terminated\n" };
         $password = <STDIN>;
         1;
-    } or $read_error = $@ || 'unknown input error';
+    } || ( $read_error = $@ || 'unknown input error' );
     $termios->setlflag($original_lflag);
     eval {
         defined $termios->setattr( $fd, TCSANOW )
           or die "$!\n";
         1;
     }
-      or $restore_error = $@ || $! || 'unknown error';
+      || ( $restore_error = $@ || $! || 'unknown error' );
     print "\n";
     die_tool("Could not restore terminal input mode: $restore_error")
       if $restore_error;
@@ -230,7 +230,7 @@ sub read_password {
     chomp $password;
     if ( length $password ) {
         die_tool('A WPA passphrase must contain between 8 and 63 characters')
-          unless length($password) >= 8 && length($password) <= 63;
+          if length($password) < 8 || length($password) > 63;
         die_tool(
             'Line breaks and NUL bytes are not supported in saved passphrases')
           if $password =~ /[\r\n\0]/;
@@ -402,7 +402,7 @@ sub choose_saved_or_new {
     my $choice = read_choice();
     return create_connection() if $choice eq '';
     die_tool('Invalid saved-network selection')
-      unless $choice =~ /\A[1-9][0-9]*\z/ && $choice <= @files;
+      if $choice !~ /\A[1-9][0-9]*\z/ || $choice > @files;
 
     my $path = "$WIFI_DIR/$files[ $choice - 1 ]";
     my ( $ssid, $password ) = parse_saved_config($path);
@@ -415,7 +415,7 @@ sub print_banner {
 
 sub main {
     require_root();
-    make_path( $WIFI_DIR, { mode => 0700 } ) unless -d $WIFI_DIR;
+    make_path( $WIFI_DIR, { mode => oct(700) } ) unless -d $WIFI_DIR;
     chmod 0700, $WIFI_DIR
       or die_tool("Cannot protect $WIFI_DIR: $!");
     select_interface();
