@@ -57,7 +57,6 @@ sub read_choice {
 sub setup_sandbox {
     return unless $^O eq 'openbsd';
 
-    require OpenBSD::Pledge;
     require OpenBSD::Unveil;
 
     for my $path ( $IFCONFIG, $DHCPCONTROL, '/usr/libexec/ld.so' ) {
@@ -94,9 +93,9 @@ sub setup_sandbox {
     OpenBSD::Unveil::unveil()
       or die_tool("unveil lock failed: $!");
 
-    my @promises = qw(stdio rpath wpath cpath fattr proc exec tty);
-    OpenBSD::Pledge::pledge(@promises)
-      or die_tool("pledge failed: $!");
+    # This orchestrator executes native utilities repeatedly. Without the
+    # legacy execution promise, pledge would prevent those launches.
+    # Keep the locked unveil view for operations in this Perl process.
 }
 
 sub list_wifi_interfaces {

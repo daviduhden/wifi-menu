@@ -29,7 +29,7 @@ An existing interface file is copied to `/etc/hostname.interface.wifi-menu.old` 
 
 Printable SSIDs, SSIDs with spaces and the hexadecimal representation emitted by `ifconfig` are supported. Values written to `hostname.if(5)` are enclosed in single quotes with embedded single quotes encoded as `'\''`, so shell metacharacters in an SSID or passphrase cannot be interpreted when `netstart(8)` evaluates the file; line breaks and NUL bytes are rejected. WPA passphrases must contain 8–63 characters.
 
-On OpenBSD, the Perl orchestration process locks an `unveil(2)` view and applies `pledge(2)` after choosing the interface. The Perl binding does not set `execpromises`, so `execve(2)` clears the inherited restrictions: each executed base-system utility starts with a fresh pledge state and filesystem view and then applies its own security policy. The `unveil(2)` view and `pledge(2)` promises still constrain every file operation performed by the Perl process itself. Failure to install either launcher restriction is fatal.
+On OpenBSD, the Perl orchestration process locks an `unveil(2)` view after choosing the interface. The launcher stays unpledged because it must execute native utilities without the removed execution promise. It does not set `execpromises`, so `execve(2)` clears the inherited restrictions: each executed base-system utility starts with a fresh pledge state and filesystem view and can then apply its own security policy. The `unveil(2)` view constrains pathname operations in the Perl process itself, but there is no syscall ceiling. Failure to install or lock the view is fatal.
 
 ## Removal
 
