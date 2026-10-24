@@ -5,6 +5,7 @@
 
 use strict;
 use warnings;
+use Fcntl      qw(O_CREAT O_EXCL O_WRONLY);
 use File::Copy qw(copy);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
@@ -16,11 +17,28 @@ my $DHCPCONTROL = '/usr/sbin/dhcpleasectl';
 my $INT         = '';
 
 sub logi { print "[INFO] $_[0]\n" }
-sub logw { print STDERR "[WARN] $_[0]\n" }
 
 sub die_tool {
     print STDERR "[ERROR] $_[0]\n";
     exit 1;
+}
+
+# Render untrusted bytes without letting terminal control sequences through.
+sub display_label {
+    my ($value) = @_;
+    $value =~ s/([^\x20-\x7e])/sprintf( '\\x%02x', ord($1) )/ge;
+    return $value;
+}
+
+# netstart(8) reads every hostname.if(5) line without read -r and then
+# word-splits it before eval.  Values that cannot survive that pipeline
+# must be rejected instead of being written in a different form.
+sub validate_saved_value {
+    my ( $value, $label ) = @_;
+    die_tool("$label cannot contain line breaks or NUL bytes")
+      if $value =~ /[\r\n\0]/;
+    die_tool("$label cannot contain tabs or repeated spaces")
+      if $value =~ /\t/ || $value =~ /  /;
 }
 
 sub run {
@@ -59,14 +77,18 @@ sub setup_sandbox {
 
     require OpenBSD::Unveil;
 
-    for my $path ( $IFCONFIG, $DHCPCONTROL, '/usr/libexec/ld.so' ) {
-        next unless -e $path;
+    for my $path ( $IFCONFIG, $DHCPCONTROL ) {
+        -e $path or die_tool("Required tool $path not found");
         OpenBSD::Unveil::unveil( $path, 'rx' )
           or die_tool("unveil($path) failed: $!");
     }
+    if ( -e '/usr/libexec/ld.so' ) {
+        OpenBSD::Unveil::unveil( '/usr/libexec/ld.so', 'rx' )
+          or die_tool("unveil(/usr/libexec/ld.so) failed: $!");
+    }
 
-    # /dev/urandom is read when Perl seeds the random names used by
-    # File::Temp; unveiling it avoids falling back to weaker sources.
+    # Base OpenBSD Perl seeds with arc4random(3); keep /dev/urandom for
+    # Perl builds that still read it and for File::Temp's fallbacks.
     for my $path ( '/usr/lib', '/var/run/ld.so.hints', '/dev/urandom' ) {
         next unless -e $path;
         OpenBSD::Unveil::unveil( $path, 'r' )
@@ -85,22 +107,18 @@ sub setup_sandbox {
         OpenBSD::Unveil::unveil( $path, 'rwc' )
           or die_tool("unveil($path) failed: $!");
     }
-    for my $path ( '/dev/null', '/dev/dhcpleased.sock' ) {
-        next unless -e $path;
-        OpenBSD::Unveil::unveil( $path, 'rw' )
-          or die_tool("unveil($path) failed: $!");
-    }
     OpenBSD::Unveil::unveil()
       or die_tool("unveil lock failed: $!");
 
-    # This orchestrator executes native utilities repeatedly. Without the
-    # legacy execution promise, pledge would prevent those launches.
-    # Keep the locked unveil view for operations in this Perl process.
+    # This launcher deliberately remains unpledged: it executes native
+    # utilities and does not set execpromises.  Without execpromises,
+    # execve(2) clears the unveil view for each child, so the locked view
+    # constrains only pathname operations in this Perl process.
 }
 
 sub list_wifi_interfaces {
     my ( $ok, $output ) = capture( $IFCONFIG, 'wlan' );
-    return unless $ok;
+    die_tool('Cannot list interfaces in the wlan group') unless $ok;
 
     my %seen;
     return grep { !$seen{$_}++ }
@@ -144,8 +162,9 @@ sub clear_wireless_settings {
     ) or die_tool("Failed to clear wireless settings on $INT");
 }
 
-# ifconfig(8) prints printable SSIDs verbatim, quotes those containing
-# whitespace, and represents non-printable SSIDs as 0x-prefixed hex.
+# ifconfig(8) prints printable SSIDs bare, wraps values containing spaces
+# in double quotes without escaping embedded quotes, and prints all other
+# bytes as 0x-prefixed hex.
 sub scan_networks {
     logi("Scanning for Wi-Fi networks on $INT...");
     my ( $ok, $output ) = capture( $IFCONFIG, $INT, 'scan' );
@@ -157,14 +176,22 @@ sub scan_networks {
 
         # Scan results are indented "nwid <ssid> chan <n> ..." lines.
         # Anchoring on the leading whitespace stops the interface status
-        # line that precedes the results, and matching a quoted SSID as
-        # a unit stops an SSID containing " chan " from being split.
-        next unless $line =~ /^\s*nwid\s+("[^"]*"|\S+)\s+chan\s+/;
+        # line that precedes the results, and matching the quoted form
+        # greedily stops an SSID containing " chan " from being split.
+        next unless $line =~ /^\s*nwid\s+(".*"|\S+)\s+chan\s+/;
         my $printed = $1;
+
+        # An empty SSID and a literal two-quote SSID are both printed as
+        # "" and cannot be distinguished here.
         next if $printed eq '""';
+
+        # Strip only the outer quotes that ifconfig adds for whitespace.
+        # A bare SSID that itself starts and ends with a quote must stay
+        # intact.  Hex strings are passed back to ifconfig unchanged.
         my $ssid = $printed;
-        $ssid = substr( $ssid, 1, -1 )
-          if $ssid =~ /\A".*"\z/s;
+        if ( $ssid =~ /\A"(.*)"\z/s && $ssid =~ /\s/ ) {
+            $ssid = $1;
+        }
         next if $seen{$ssid}++;
         push @networks, { display => $printed, ssid => $ssid };
     }
@@ -211,6 +238,8 @@ sub read_password {
     eval {
         local $SIG{INT}  = sub { die "interrupted\n" };
         local $SIG{TERM} = sub { die "terminated\n" };
+        local $SIG{HUP}  = sub { die "interrupted\n" };
+        local $SIG{QUIT} = sub { die "terminated\n" };
         $password = <STDIN>;
         1;
     } || ( $read_error = $@ || 'unknown input error' );
@@ -228,38 +257,67 @@ sub read_password {
     die_tool('Could not read the passphrase') unless defined $password;
     chomp $password;
     if ( length $password ) {
-        die_tool('A WPA passphrase must contain between 8 and 63 characters')
-          if length($password) < 8 || length($password) > 63;
-        die_tool(
-            'Line breaks and NUL bytes are not supported in saved passphrases')
-          if $password =~ /[\r\n\0]/;
+        # ifconfig accepts either an 8-63 byte passphrase or a raw PSK
+        # written as 0x followed by 64 hexadecimal digits.
+        if ( $password !~ /\A0[xX][0-9a-fA-F]{64}\z/ ) {
+            die_tool(
+                'A WPA passphrase must contain between 8 and 63 characters')
+              if length($password) < 8 || length($password) > 63;
+        }
+        validate_saved_value( $password, 'A WPA passphrase' );
     }
     return $password;
 }
 
 sub hostname_arg {
     my ($value) = @_;
+    validate_saved_value( $value, 'A saved value' );
 
     # netstart(8) evaluates every hostname.if(5) line with the shell, so
     # a bare word could run a command or be mangled.  Wrap the value in
     # single quotes and encode each embedded single quote as '\''.
-    die_tool('A saved value cannot contain line breaks or NUL bytes')
-      if $value =~ /[\r\n\0]/;
     my @parts = split /'/, $value, -1;
-    return "'" . join( "'\\''", @parts ) . "'";
+    my $word = "'" . join( "'\\''", @parts ) . "'";
+
+    # netstart reads the file with ksh read(1) without -r, which consumes
+    # one level of backslashes.  Double them so eval sees our quoting.
+    $word =~ s/\\/\\\\/g;
+    return $word;
 }
 
 # Decode a field produced by hostname_arg(), while still accepting the
 # bare and double-quoted formats written by older versions.
 sub unquote_hn_field {
     my ($field) = @_;
-    return $1 if $field         =~ /\A"([^"]*)"\z/s;
-    return $field unless $field =~ /\A'/;
-    my $sep = "'\\''";
-    $field =~ s/\A'//;
-    $field =~ s/'\z//;
-    $field =~ s/\Q$sep\E/'/g;
-    return $field;
+    return unless defined $field;
+    my $text = $field;
+
+    # Current files double every backslash so that netstart's read(1)
+    # leaves the shell word intact.  Undo that layer when present; older
+    # files used a single backslash and are decoded as-is.
+    $text =~ s/\\(.)/$1/gs if $text =~ /\\\\/;
+
+    return $1 if $text =~ /\A"([^"]*)"\z/s;
+    return $text unless $text =~ /\A'/;
+
+    my $value = '';
+    my $i     = 1;
+    my $len   = length $text;
+    while ( $i < $len ) {
+        my $char = substr $text, $i, 1;
+        if ( $char eq "'" ) {
+            if ( substr( $text, $i, 4 ) eq "'\\''" ) {
+                $value .= "'";
+                $i += 4;
+                next;
+            }
+            return if $i != $len - 1;
+            return $value;
+        }
+        $value .= $char;
+        $i++;
+    }
+    return;
 }
 
 sub config_path {
@@ -267,13 +325,18 @@ sub config_path {
     return sprintf '%s/%s.%s', $WIFI_DIR, unpack( 'H*', $ssid ), $INT;
 }
 
+sub config_content {
+    my ( $ssid, $password ) = @_;
+    die_tool('The SSID cannot be empty') unless length $ssid;
+    my $line = 'join ' . hostname_arg($ssid);
+    $line .= ' wpakey ' . hostname_arg($password) if length $password;
+    return "$line\ninet autoconf\n";
+}
+
 sub write_config {
     my ( $ssid, $password ) = @_;
-    my $path       = config_path($ssid);
-    my $ssid_field = hostname_arg($ssid);
-    my $line       = "join $ssid_field";
-    $line .= ' wpakey ' . hostname_arg($password) if length $password;
-    my $content = "$line\ninet autoconf\n";
+    my $path    = config_path($ssid);
+    my $content = config_content( $ssid, $password );
 
     # UNLINK removes the staging file if the write fails; after the
     # successful rename the recorded name no longer exists.
@@ -297,18 +360,27 @@ sub parse_saved_config {
     open my $fh, '<', $path or die_tool("Cannot read $path: $!");
     my $line = <$fh> // '';
     close $fh or die_tool("Cannot close $path: $!");
+    chomp $line;
+    die_tool("Invalid saved configuration: $path") if $line =~ /[\r\0]/;
 
-    my $single = qr/'[^']*(?:'\\''[^']*)*'/;
-    my $field  = qr/$single|"[^"]*"|\S+/;
-    $line =~ /\Ajoin\s+($field)(?:\s+wpakey\s+($field))?\s*\z/
+    my $single = qr/'(?:[^']|'\\\\''|'\\'')*'/;
+    my $field  = qr/$single|"[^"]*"|[^\s'"]+/;
+    $line =~ /\Ajoin[ \t]+($field)(?:[ \t]+wpakey[ \t]+($field))?[ \t]*\z/
       or die_tool("Invalid saved configuration: $path");
-    my $ssid     = unquote_hn_field($1);
-    my $password = defined $2 ? unquote_hn_field($2) : '';
+    my $ssid_field     = $1;
+    my $password_field = $2;
+    my $ssid           = unquote_hn_field($ssid_field);
+    my $password =
+      defined $password_field ? unquote_hn_field($password_field) : '';
+    die_tool("Invalid saved configuration: $path")
+      unless defined $ssid && length $ssid && defined $password;
+    validate_saved_value( $ssid,     'The saved SSID' );
+    validate_saved_value( $password, 'The saved passphrase' );
     return ( $ssid, $password );
 }
 
 sub install_hostname_file {
-    my ($source)         = @_;
+    my ($content)        = @_;
     my $destination      = "/etc/hostname.$INT";
     my $temporary        = "/etc/.hostname.$INT.wifi-menu.$$";
     my $backup           = "$destination.wifi-menu.old";
@@ -333,10 +405,18 @@ sub install_hostname_file {
         }
     }
     unlink $temporary if -e $temporary;
-    unless ( copy( $source, $temporary ) ) {
+    sysopen my $fh, $temporary, O_WRONLY | O_CREAT | O_EXCL, 0600
+      or die_tool("Cannot stage $destination: $!");
+    unless ( print {$fh} $content ) {
+        my $error = $!;
+        close $fh;
+        unlink $temporary;
+        die_tool("Cannot write $temporary: $error");
+    }
+    unless ( close $fh ) {
         my $error = $!;
         unlink $temporary;
-        die_tool("Cannot stage $destination: $error");
+        die_tool("Cannot close $temporary: $error");
     }
     chmod 0600, $temporary
       or do {
@@ -353,25 +433,31 @@ sub install_hostname_file {
 }
 
 sub apply_connection {
-    my ( $ssid, $password, $config ) = @_;
+    my ( $ssid, $password ) = @_;
+    die_tool('The SSID cannot be empty') unless length $ssid;
+    validate_saved_value( $ssid, 'The SSID' );
+    validate_saved_value( $password, 'The passphrase' ) if length $password;
     clear_wireless_settings();
 
     my @join = ( $IFCONFIG, $INT, 'join', $ssid );
     push @join, 'wpakey', $password if length $password;
-    run(@join) or die_tool("Failed to join network $ssid");
+    run(@join) or die_tool("Failed to join network " . display_label($ssid));
     run( $IFCONFIG, $INT, 'inet', 'autoconf' )
       or die_tool("Failed to enable IPv4 autoconfiguration on $INT");
-    install_hostname_file($config);
-    run( $DHCPCONTROL, '-w', '10', $INT )
-      or die_tool("DHCP did not complete on $INT within 10 seconds");
-    logi("Configured $INT for $ssid");
+    install_hostname_file( config_content( $ssid, $password ) );
+
+    my ( $ok, $output ) = capture( $DHCPCONTROL, '-w', '10', $INT );
+    print $output if length $output;
+    die_tool("DHCP did not complete on $INT within 10 seconds")
+      unless $ok && $output =~ /\bBound\b/;
+    logi( "Configured $INT for " . display_label($ssid) );
 }
 
 sub create_connection {
     my $network  = choose_network( scan_networks() );
     my $password = read_password( $network->{display} );
-    my $config   = write_config( $network->{ssid}, $password );
-    apply_connection( $network->{ssid}, $password, $config );
+    apply_connection( $network->{ssid}, $password );
+    write_config( $network->{ssid}, $password );
 }
 
 sub saved_connections {
@@ -395,7 +481,7 @@ sub choose_saved_or_new {
         # stray file that happens to match the filename pattern.
         my $valid = $hex =~ /\A(?:[0-9a-f]{2})+\z/;
         my $label = $valid ? pack( 'H*', $hex ) : $files[$i];
-        printf "%d) %s\n", $i + 1, $label;
+        printf "%d) %s\n", $i + 1, display_label($label);
     }
     print "\nChoose a saved network or press Enter to scan: ";
     my $choice = read_choice();
@@ -405,7 +491,7 @@ sub choose_saved_or_new {
 
     my $path = "$WIFI_DIR/$files[ $choice - 1 ]";
     my ( $ssid, $password ) = parse_saved_config($path);
-    apply_connection( $ssid, $password, $path );
+    apply_connection( $ssid, $password );
 }
 
 sub print_banner {
@@ -414,7 +500,12 @@ sub print_banner {
 
 sub main {
     require_root();
-    make_path( $WIFI_DIR, { mode => oct(700) } ) unless -d $WIFI_DIR;
+    umask 077;
+    unless ( -d $WIFI_DIR ) {
+        make_path( $WIFI_DIR, { mode => oct(700) } )
+          or die_tool("Cannot create $WIFI_DIR");
+    }
+    die_tool("$WIFI_DIR is not a directory") unless -d $WIFI_DIR;
     chmod 0700, $WIFI_DIR
       or die_tool("Cannot protect $WIFI_DIR: $!");
     select_interface();
