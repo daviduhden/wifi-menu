@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # Interactive Wi-Fi network manager for OpenBSD.
-# See LICENSE for copyright and licence details.
+# See LICENSE for copyright and license details.
 
 use strict;
 use warnings;
@@ -16,8 +16,13 @@ my $IFCONFIG    = '/sbin/ifconfig';
 my $DHCPCONTROL = '/usr/sbin/dhcpleasectl';
 my $INT         = '';
 
+# Print an informational message to stdout.  The interactive prompts also use
+# stdout, so callers can redirect status output without hiding questions.
 sub logi { print "[INFO] $_[0]\n" }
 
+# Report a fatal error and exit.  All failures that occur after the script has
+# started changing system state use this path so the operator sees one clear
+# diagnostic instead of a Perl exception.
 sub die_tool {
     print STDERR "[ERROR] $_[0]\n";
     exit 1;
@@ -41,12 +46,18 @@ sub validate_saved_value {
       if $value =~ /\t/ || $value =~ /  /;
 }
 
+# Run a command with list-form argv so SSIDs and passphrases are never parsed
+# by a shell.  Returns true only for an exit status of zero.
 sub run {
     my (@command) = @_;
     system { $command[0] } @command;
     return $? == 0;
 }
 
+# Run a command and capture all of its output.  The command is executed with
+# list-form open and no shell.  The caller receives both the close status and
+# the complete output so it can distinguish an execution failure from an empty
+# result.
 sub capture {
     my (@command) = @_;
     open my $fh, '-|', @command
@@ -57,6 +68,9 @@ sub capture {
     return ( $ok, $output );
 }
 
+# Refuse to continue unless the effective user is root.  The script edits files
+# under /etc and configures network interfaces, so this check must happen before
+# any path is created or changed.
 sub require_root {
     die_tool('This script must be run as root') if $> != 0;
 }
@@ -72,6 +86,11 @@ sub read_choice {
     return $line;
 }
 
+# Apply the unveil(2) policy for the selected interface.  Interface discovery
+# happens before this call, so the policy can name the exact config and backup
+# paths.  The process remains unpledged because it must exec native utilities
+# and the Perl binding cannot restrict exec promises; each child therefore
+# starts with an empty unveil view.
 sub setup_sandbox {
     return unless $^O eq 'openbsd';
 
@@ -116,6 +135,8 @@ sub setup_sandbox {
     # constrains only pathname operations in this Perl process.
 }
 
+# List interfaces in the ifconfig(8) "wlan" group and extract their names.
+# Duplicate names are removed while preserving the command's order.
 sub list_wifi_interfaces {
     my ( $ok, $output ) = capture( $IFCONFIG, 'wlan' );
     die_tool('Cannot list interfaces in the wlan group') unless $ok;
@@ -126,6 +147,9 @@ sub list_wifi_interfaces {
       split /\n/, $output;
 }
 
+# Select one interface automatically when there is only one, or prompt for a
+# one-based index.  An empty answer cancels the program; out-of-range and
+# nonnumeric answers are errors rather than accidental defaults.
 sub choose_interface {
     my (@interfaces) = @_;
     die_tool('No Wi-Fi interfaces found in the wlan group')
@@ -147,6 +171,8 @@ sub choose_interface {
     return $interfaces[ $choice - 1 ];
 }
 
+# Store the selected interface in the script global and bring it up.  The
+# remaining functions use $INT as the implicit current interface.
 sub select_interface {
     my @interfaces = list_wifi_interfaces();
     $INT = choose_interface(@interfaces) // exit 0;
@@ -154,6 +180,10 @@ sub select_interface {
       unless run( $IFCONFIG, $INT, 'up' );
 }
 
+# Clear all wireless state on the interface before joining a new network.
+# ifconfig(8) accepts several clearing options in one invocation; a failure is
+# fatal because a stale join list or key would make the next connection
+# ambiguous.
 sub clear_wireless_settings {
     run(
         $IFCONFIG, $INT,     '-bssid', '-chan',
@@ -162,9 +192,11 @@ sub clear_wireless_settings {
     ) or die_tool("Failed to clear wireless settings on $INT");
 }
 
-# ifconfig(8) prints printable SSIDs bare, wraps values containing spaces
-# in double quotes without escaping embedded quotes, and prints all other
-# bytes as 0x-prefixed hex.
+# Scan for networks and parse ifconfig(8) scan output into display/SSID pairs.
+# Printable SSIDs are printed bare, values containing spaces are wrapped in
+# double quotes without escaping embedded quotes, and all other bytes are shown
+# as 0x-prefixed hex. The printed form is kept for the menu because it
+# preserves that spelling; the ssid field is passed back to ifconfig.
 sub scan_networks {
     logi("Scanning for Wi-Fi networks on $INT...");
     my ( $ok, $output ) = capture( $IFCONFIG, $INT, 'scan' );
@@ -199,6 +231,8 @@ sub scan_networks {
     return @networks;
 }
 
+# Prompt for one scanned network.  An empty answer exits successfully; a
+# malformed or out-of-range selection is a fatal input error.
 sub choose_network {
     my @networks = @_;
     logi('Available Wi-Fi networks:');
@@ -213,6 +247,11 @@ sub choose_network {
     return $networks[ $choice - 1 ];
 }
 
+# Read a WPA passphrase without echoing it.  The terminal mode is saved and
+# restored on every path, including SIGINT, SIGTERM, SIGQUIT and SIGHUP, so an
+# interrupted prompt does not leave the controlling terminal without echo.  An
+# empty answer selects an open network; nonempty values must be either a
+# 64-hex-digit raw PSK or an 8..63 byte passphrase.
 sub read_password {
     my ($display) = @_;
     print "Passphrase for $display (empty for an open network): ";
@@ -320,11 +359,18 @@ sub unquote_hn_field {
     return;
 }
 
+# Derive the saved-configuration path for an SSID.  The SSID is hex-encoded so
+# arbitrary bytes, slashes and missing bytes cannot escape $WIFI_DIR or make
+# names ambiguous; the interface name is appended to keep per-interface files
+# distinct.
 sub config_path {
     my ($ssid) = @_;
     return sprintf '%s/%s.%s', $WIFI_DIR, unpack( 'H*', $ssid ), $INT;
 }
 
+# Generate the canonical hostname.if(5) content for one network.  Only the
+# join line and IPv4 autoconfiguration are produced; the values are quoted by
+# hostname_arg() so netstart(8) sees exactly one argument per field.
 sub config_content {
     my ( $ssid, $password ) = @_;
     die_tool('The SSID cannot be empty') unless length $ssid;
@@ -333,6 +379,9 @@ sub config_content {
     return "$line\ninet autoconf\n";
 }
 
+# Persist a newly successful connection.  The file is written to a private
+# temporary in $WIFI_DIR and renamed into place, so a crash cannot leave a
+# partially written credential file under its final name.
 sub write_config {
     my ( $ssid, $password ) = @_;
     my $path    = config_path($ssid);
@@ -355,6 +404,10 @@ sub write_config {
     return $path;
 }
 
+# Parse a saved "join ... [wpakey ...]" line.  The grammar accepts the current
+# single-quoted encoding produced by hostname_arg() as well as the older bare
+# and double-quoted forms, then revalidates the decoded values before they are
+# passed back to ifconfig or copied into a new config.
 sub parse_saved_config {
     my ($path) = @_;
     open my $fh, '<', $path or die_tool("Cannot read $path: $!");
@@ -379,6 +432,10 @@ sub parse_saved_config {
     return ( $ssid, $password );
 }
 
+# Install /etc/hostname.<if> atomically.  The previous file is first copied to
+# a private staging file and renamed to the one-generation backup; the new
+# content uses a separate staging file and a final rename.  Every staging and
+# backup path is mode 0600 because the file contains the WPA passphrase.
 sub install_hostname_file {
     my ($content)        = @_;
     my $destination      = "/etc/hostname.$INT";
@@ -432,6 +489,10 @@ sub install_hostname_file {
       };
 }
 
+# Join the selected network, enable IPv4 autoconfiguration, install the
+# persistent hostname file, and wait for dhcpleased to report a bound lease.
+# dhcpleasectl exits zero even on timeout, so success is determined from both
+# its status and the "Bound" token in its output.
 sub apply_connection {
     my ( $ssid, $password ) = @_;
     die_tool('The SSID cannot be empty') unless length $ssid;
@@ -453,6 +514,9 @@ sub apply_connection {
     logi( "Configured $INT for " . display_label($ssid) );
 }
 
+# Interactive new-connection path: scan, choose, ask for a passphrase, apply,
+# and only then save the credentials.  Saving after a successful DHCP result
+# avoids leaving a usable-looking file for a network that never connected.
 sub create_connection {
     my $network  = choose_network( scan_networks() );
     my $password = read_password( $network->{display} );
@@ -460,6 +524,9 @@ sub create_connection {
     write_config( $network->{ssid}, $password );
 }
 
+# List saved files for the current interface.  Filenames encode the SSID as
+# hexadecimal and end in ".<interface>"; unrelated files in the directory are
+# ignored rather than presented as networks.
 sub saved_connections {
     opendir my $dh, $WIFI_DIR
       or die_tool("Cannot open $WIFI_DIR: $!");
@@ -469,6 +536,9 @@ sub saved_connections {
     return @files;
 }
 
+# Offer saved networks first.  Selecting one revalidates the saved values and
+# reapplies them without rewriting the file; an empty answer falls through to a
+# fresh scan.  Only well-formed hexadecimal filenames are decoded for display.
 sub choose_saved_or_new {
     my @files = saved_connections();
     return create_connection() unless @files;
@@ -498,6 +568,9 @@ sub print_banner {
     print "\nOpenBSD Wi-Fi network manager\n\n";
 }
 
+# Script entry point.  Root, umask and the credential directory are established
+# before interface discovery; the sandbox is installed only after the interface
+# name is known so its unveil rules can name the exact hostname files.
 sub main {
     require_root();
     umask 077;
