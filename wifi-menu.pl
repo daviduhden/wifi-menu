@@ -296,6 +296,7 @@ sub read_password {
     die_tool('Could not read the passphrase') unless defined $password;
     chomp $password;
     if ( length $password ) {
+
         # ifconfig accepts either an 8-63 byte passphrase or a raw PSK
         # written as 0x followed by 64 hexadecimal digits.
         if ( $password !~ /\A0[xX][0-9a-fA-F]{64}\z/ ) {
@@ -316,7 +317,7 @@ sub hostname_arg {
     # a bare word could run a command or be mangled.  Wrap the value in
     # single quotes and encode each embedded single quote as '\''.
     my @parts = split /'/, $value, -1;
-    my $word = "'" . join( "'\\''", @parts ) . "'";
+    my $word  = "'" . join( "'\\''", @parts ) . "'";
 
     # netstart reads the file with ksh read(1) without -r, which consumes
     # one level of backslashes.  Double them so eval sees our quoting.
@@ -336,7 +337,7 @@ sub unquote_hn_field {
     # files used a single backslash and are decoded as-is.
     $text =~ s/\\(.)/$1/gs if $text =~ /\\\\/;
 
-    return $1 if $text =~ /\A"([^"]*)"\z/s;
+    return $1 if $text        =~ /\A"([^"]*)"\z/s;
     return $text unless $text =~ /\A'/;
 
     my $value = '';
@@ -496,13 +497,13 @@ sub install_hostname_file {
 sub apply_connection {
     my ( $ssid, $password ) = @_;
     die_tool('The SSID cannot be empty') unless length $ssid;
-    validate_saved_value( $ssid, 'The SSID' );
+    validate_saved_value( $ssid,     'The SSID' );
     validate_saved_value( $password, 'The passphrase' ) if length $password;
     clear_wireless_settings();
 
     my @join = ( $IFCONFIG, $INT, 'join', $ssid );
     push @join, 'wpakey', $password if length $password;
-    run(@join) or die_tool("Failed to join network " . display_label($ssid));
+    run(@join) or die_tool( "Failed to join network " . display_label($ssid) );
     run( $IFCONFIG, $INT, 'inet', 'autoconf' )
       or die_tool("Failed to enable IPv4 autoconfiguration on $INT");
     install_hostname_file( config_content( $ssid, $password ) );
