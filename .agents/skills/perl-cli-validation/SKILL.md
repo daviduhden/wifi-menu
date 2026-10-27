@@ -49,6 +49,9 @@ Use the domain skills for interface, hostname and secret semantics.
   There is no functional test suite or lint target. GitHub Actions runs
   `make`-independent agent/skills synchronization checks on pull requests;
   those checks do not exercise Perl behavior or OpenBSD commands.
+- Static: run `checkmake Makefile` when checkmake is installed. Keep recipes
+  within its five-line target-body limit, preserving failure short-circuiting
+  when joining commands.
 - Static: review the regexes and bounds logic against the cases above;
   run `git diff --check` for whitespace.
 - Real: interactive prompts and terminal echo require OpenBSD, root and a

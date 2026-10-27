@@ -73,7 +73,8 @@ here.
 - ASCII-only tracked files. Use plain hyphens, not typographic dashes.
 - LF line endings, final newline, no trailing whitespace.
 - Makefile recipes use tabs and `@`; path variables use `?=`; `.PHONY`
-  stays last.
+  stays last. Keep target bodies within checkmake's five-line default, and
+  preserve command order and failure short-circuiting when joining recipes.
 - Preserve the ISC copyright and license notices.
 - Do not impose a historical 72-column limit. There is no enforced line
   length; current Perl lines stay under 80 columns.
