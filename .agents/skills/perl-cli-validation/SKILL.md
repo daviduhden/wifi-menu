@@ -46,7 +46,9 @@ Use the domain skills for interface, hostname and secret semantics.
 ## Validations
 
 - Static: `make test` runs `perl -c wifi-menu.pl` and checks syntax only.
-  There is no functional test suite, no CI and no lint target.
+  There is no functional test suite or lint target. GitHub Actions runs
+  `make`-independent agent/skills synchronization checks on pull requests;
+  those checks do not exercise Perl behavior or OpenBSD commands.
 - Static: review the regexes and bounds logic against the cases above;
   run `git diff --check` for whitespace.
 - Real: interactive prompts and terminal echo require OpenBSD, root and a
@@ -82,3 +84,7 @@ Use the domain skills for interface, hostname and secret semantics.
   `POSIX` for `Termios`.
 - Related skills: `openbsd-wifi-interface-discovery`,
   `wifi-secret-handling`.
+
+## Maintenance & Continuous Learning
+
+When this skill is used to modify the repository, review this skill after the implementation. Update it when the workflow, relevant project behavior, tools, configuration, paths, validation steps or assumptions have changed. Add reusable findings that would improve a future run, correct guidance that proved inaccurate, and keep examples and validation procedures current. Remove obsolete or conflicting instructions. Include only knowledge that applies to future use; do not add one-off details from the current execution. Review related skills and `AGENTS.md` for consistency, then run `make check-agent-sync` and the applicable checks documented above. Report the synchronization result and any check that could not be run.

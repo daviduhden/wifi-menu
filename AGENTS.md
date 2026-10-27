@@ -4,8 +4,9 @@
 
 `wifi-menu` is an OpenBSD-only, root-run, interactive client-mode Wi-Fi
 configurator. It is a single Perl script (`wifi-menu.pl`) installed by a
-small Makefile. There is no CPAN dependency, no test suite, no CI and no
-linter configuration. The license is ISC; see `LICENSE`.
+small Makefile. There is no CPAN dependency, functional test suite or
+linter configuration. GitHub Actions runs the agent/skills maintenance
+check on pull requests. The license is ISC; see `LICENSE`.
 
 The program never configures a Host AP, forwarding, a DHCP service, a
 resolver or MAC randomization. It may cause `dhcpleased` to install a
@@ -81,6 +82,7 @@ here.
 
 ```sh
 make test                 # perl -c wifi-menu.pl; syntax only
+make check-agent-sync     # enforce instruction maintenance and structure
 make help                 # list targets
 make -n install           # dry run
 make -n uninstall         # dry run
@@ -111,8 +113,9 @@ staging files; it deliberately leaves active `/etc/hostname.*` files.
   `ifconfig`, `dhcpleasectl`, `unveil` or permissions.
 - Use dummy SSIDs and passphrases in examples. Never print, commit or log
   a real passphrase, backup or saved file.
-- Do not invent a test framework, CI workflow or linter target. None
-  exists in this repository.
+- Do not invent a functional test framework or linter target. The
+  GitHub Actions workflow only enforces agent/skills synchronization;
+  it does not exercise the OpenBSD program.
 
 ## Preexisting changes and Git
 
@@ -131,3 +134,37 @@ Load only the skill that matches the change:
 - [wifi-secret-handling](.agents/skills/wifi-secret-handling/SKILL.md)
 - [network-configuration-recovery](.agents/skills/network-configuration-recovery/SKILL.md)
 - [perl-cli-validation](.agents/skills/perl-cli-validation/SKILL.md)
+
+## Continuous Agent & Skills Maintenance
+
+Agent instructions and skills are living repository artifacts.
+
+Every repository modification MUST include an agent/skills synchronization step.
+
+Before completing any task, inspect the applicable AGENTS.md and SKILL.md files, update the affected instructions, and validate their consistency with the implementation.
+
+A code change without the corresponding agent knowledge maintenance is considered incomplete.
+
+Never claim completion when the synchronization step has been skipped or has failed.
+
+This review is required after every repository change, including code, configuration, dependencies, features, bug fixes, refactors, tests, workflows, documentation and repository structure changes. Before editing, inventory applicable `AGENTS.md`, `.github/agents/*.agent.md`, `.agents/skills/**/SKILL.md`, `.github/skills/**/SKILL.md`, `.claude/skills/**/SKILL.md`, and other tool instruction files. Then identify skills by their activation scope and the functions, files, tools or invariants touched by the change.
+
+Review the root instructions and each relevant specialized instruction after implementation. Update existing instructions when behavior, procedures, assumptions, tools, commands, paths or reusable lessons changed. Create a skill only when the repository has a reusable, distinct workflow that no existing skill covers; do not create duplicate or task-specific skills. Keep specialized agents synchronized with their related skills and the actual repository workflow. Remove obsolete or contradictory guidance and verify every local path and cross-reference.
+
+Every task that changes repository files must include a substantive, relevant change to at least one agent instruction or skill. The automated check rejects missing, empty and obviously trivial instruction edits; it cannot judge semantic relevance, which still requires review. If a useful synchronization change cannot be made, document why and report the task as incomplete. Do not add timestamps or cosmetic edits to satisfy the check.
+
+Run `make check-agent-sync` before completion. It checks Git changes, instruction structure, skill frontmatter, required maintenance sections, substantive instruction changes and local Markdown links. For a pull request, CI runs the same checker against the PR base. Also run `git diff --check` and the implementation-specific checks applicable to the task. These structural checks do not establish semantic correctness.
+
+### Definition of Done
+
+- [ ] Repository changes implemented.
+- [ ] Relevant agent instructions reviewed.
+- [ ] Relevant skills reviewed.
+- [ ] Affected AGENTS.md / SKILL.md files updated.
+- [ ] Obsolete knowledge removed.
+- [ ] New reusable knowledge incorporated.
+- [ ] Agent and skill references validated.
+- [ ] Automated maintenance checks passed.
+- [ ] Final synchronization status reported.
+
+If any item fails, correct it or explicitly report the limitation and leave the task incomplete. Final reports must include an **Agent & Skills Synchronization** section listing agents reviewed, skills reviewed, instruction files updated, knowledge incorporated or corrected, validations actually run, and a final `PASS` or `FAIL` status. Never claim a validation passed unless it ran successfully.

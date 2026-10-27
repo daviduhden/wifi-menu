@@ -93,3 +93,7 @@ to `hostname-if-safe-generation` and `wifi-secret-handling`.
   <https://github.com/openbsd/src/blob/master/sbin/ifconfig/ifconfig.c>
 - Related skills: `perl-cli-validation` for menu parsing;
   `hostname-if-safe-generation` for the selected SSID.
+
+## Maintenance & Continuous Learning
+
+When this skill is used to modify the repository, review this skill after the implementation. Update it when the workflow, relevant project behavior, tools, configuration, paths, validation steps or assumptions have changed. Add reusable findings that would improve a future run, correct guidance that proved inaccurate, and keep examples and validation procedures current. Remove obsolete or conflicting instructions. Include only knowledge that applies to future use; do not add one-off details from the current execution. Review related skills and `AGENTS.md` for consistency, then run `make check-agent-sync` and the applicable checks documented above. Report the synchronization result and any check that could not be run.

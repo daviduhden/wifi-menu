@@ -48,11 +48,15 @@ clean:
 
 # Display help
 help:
-	@printf "Usage:\n  make all        - Install the script\n  make install    - Install the script\n  make uninstall  - Uninstall and preserve saved credentials\n  make purge      - Uninstall, remove saved credentials and backups\n  make test       - Check the Perl script syntax\n  make clean      - Remove editor backup files\n  make help       - Display this help message\n"
+	@printf "Usage:\n  make all               - Install the script\n  make install           - Install the script\n  make uninstall         - Uninstall and preserve saved credentials\n  make purge             - Uninstall, remove saved credentials and backups\n  make test              - Check the Perl script syntax\n  make check-agent-sync  - Enforce agent and skills maintenance\n  make clean             - Remove editor backup files\n  make help              - Display this help message\n"
 
 # Static check: verify that the script parses.
 test:
 	@echo "$(INFO) Checking $(SCRIPT_SRC) syntax"
 	@perl -c $(SCRIPT_SRC)
 
-.PHONY: all install uninstall purge clean help test
+# Enforce a substantive instruction update for every repository change.
+check-agent-sync:
+	@perl scripts/check-agent-sync.pl
+
+.PHONY: all install uninstall purge clean help test check-agent-sync

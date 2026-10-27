@@ -97,3 +97,7 @@ belongs to `wifi-secret-handling`.
 - [hostname.if(5)](https://man.openbsd.org/hostname.if.5)
 - Related skills: `hostname-if-safe-generation`,
   `wifi-secret-handling`.
+
+## Maintenance & Continuous Learning
+
+When this skill is used to modify the repository, review this skill after the implementation. Update it when the workflow, relevant project behavior, tools, configuration, paths, validation steps or assumptions have changed. Add reusable findings that would improve a future run, correct guidance that proved inaccurate, and keep examples and validation procedures current. Remove obsolete or conflicting instructions. Include only knowledge that applies to future use; do not add one-off details from the current execution. Review related skills and `AGENTS.md` for consistency, then run `make check-agent-sync` and the applicable checks documented above. Report the synchronization result and any check that could not be run.
