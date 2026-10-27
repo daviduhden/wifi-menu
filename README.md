@@ -118,11 +118,11 @@ value of `WIFI_DIR`. The `WIFI_DIR` Makefile variable affects only
 
 ```sh
 $ make test
-$ make check-agent-sync
+$ make check-agent-knowledge
 ```
 
 `make test` runs `perl -c wifi-menu.pl` only. It is a syntax check, not a
-functional test. `make check-agent-sync` checks the Git change set for a
+functional test. `make check-agent-knowledge` checks the Git change set for a
 substantive update to agent or skill instructions, validates instruction
 structure and skill frontmatter, and checks local Markdown links. Pull
 requests run this check in GitHub Actions. The checker enforces structural

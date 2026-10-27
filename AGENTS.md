@@ -83,7 +83,7 @@ here.
 
 ```sh
 make test                 # perl -c wifi-menu.pl; syntax only
-make check-agent-sync     # enforce instruction maintenance and structure
+make check-agent-knowledge     # enforce instruction maintenance and structure
 make help                 # list targets
 make -n install           # dry run
 make -n uninstall         # dry run
@@ -154,7 +154,7 @@ Review the root instructions and each relevant specialized instruction after imp
 
 Every task that changes repository files must include a substantive, relevant change to at least one agent instruction or skill. The automated check rejects missing, empty and obviously trivial instruction edits; it cannot judge semantic relevance, which still requires review. If a useful synchronization change cannot be made, document why and report the task as incomplete. Do not add timestamps or cosmetic edits to satisfy the check.
 
-Run `make check-agent-sync` before completion. It checks Git changes, instruction structure, skill frontmatter, required maintenance sections, substantive instruction changes and local Markdown links. For a pull request, CI runs the same checker against the PR base. Also run `git diff --check` and the implementation-specific checks applicable to the task. These structural checks do not establish semantic correctness.
+Run `make check-agent-knowledge` before completion. It checks Git changes, instruction structure, skill frontmatter, required maintenance sections, substantive instruction changes and local Markdown links. For a pull request, CI runs the same checker against the PR base. Also run `git diff --check` and the implementation-specific checks applicable to the task. These structural checks do not establish semantic correctness.
 
 ### Definition of Done
 
@@ -169,3 +169,24 @@ Run `make check-agent-sync` before completion. It checks Git changes, instructio
 - [ ] Final synchronization status reported.
 
 If any item fails, correct it or explicitly report the limitation and leave the task incomplete. Final reports must include an **Agent & Skills Synchronization** section listing agents reviewed, skills reviewed, instruction files updated, knowledge incorporated or corrected, validations actually run, and a final `PASS` or `FAIL` status. Never claim a validation passed unless it ran successfully.
+
+### Shared Agent Knowledge Validation Contract
+
+Use `python3 scripts/validate-agent-knowledge.py --scope worktree` for local
+changes and `python3 -m unittest discover -s tests/agent_knowledge_validator -v`
+for its contract tests. The validator requires Python 3.11+ and Git, uses only
+the Python standard library, and publishes contract version `1.0.0`. All
+adopting repositories share the same CLI, AK001-AK006 identifiers, output
+schema, and exit codes (`0` pass, `1` policy failure, `2` execution/configuration
+error). For a pull request, pass both revisions with
+`--scope range --base BASE_REF --head HEAD_REF`; compare from their merge base.
+
+Read [Agent Knowledge Validation Contract](docs/agent-knowledge-validation.md)
+for the complete rules, JSON schema, optional repository configuration,
+warning semantics, and extension process. AK004 and AK006 can require human
+review; their warnings do not prove or disprove semantic correctness. Keep the
+canonical script and black-box unittest suite byte-identical across adopting
+repositories. Repository-specific requirements belong in the documented TOML
+configuration or a stable `AKX...` extension, never in a private fork of the
+shared rules. The GitHub PR workflow runs the same tests and range command;
+it does not edit files or require secrets.
