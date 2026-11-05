@@ -50,6 +50,6 @@ test:
 
 # Enforce a substantive instruction update for every repository change.
 check-agent-knowledge:
-	@python3 scripts/validate-agent-knowledge.py --scope worktree
+	@perl scripts/validate-agent-knowledge.pl --scope worktree
 
 .PHONY: all install uninstall purge clean help test check-agent-knowledge
