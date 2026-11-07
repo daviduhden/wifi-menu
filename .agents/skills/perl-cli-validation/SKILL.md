@@ -47,7 +47,7 @@ Use the domain skills for interface, hostname and secret semantics.
 
 - Static: `make test` runs `perl -c wifi-menu.pl` and checks syntax only.
   There is no functional test suite or lint target. GitHub Actions runs
-  `make`-independent agent/skills synchronization checks on pull requests;
+  `make`-independent agent/skills synchronization checks on manual dispatch;
   those checks do not exercise Perl behavior or OpenBSD commands.
 - Static: run `checkmake Makefile` when checkmake is installed. Keep recipes
   within its five-line target-body limit, preserving failure short-circuiting

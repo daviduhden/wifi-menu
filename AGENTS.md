@@ -6,7 +6,7 @@
 configurator. It is a single Perl script (`wifi-menu.pl`) installed by a
 small Makefile. There is no CPAN dependency, functional test suite or
 linter configuration. GitHub Actions runs the agent/skills maintenance
-check on pull requests. The license is ISC; see `LICENSE`.
+check on manual dispatch. The license is ISC; see `LICENSE`.
 
 The program never configures a Host AP, forwarding, a DHCP service, a
 resolver or MAC randomization. It may cause `dhcpleased` to install a
@@ -181,7 +181,7 @@ Review the root instructions and each relevant specialized instruction after imp
 
 Every task that changes repository files must include a substantive, relevant change to at least one agent instruction or skill. The automated check rejects missing, empty and obviously trivial instruction edits; it cannot judge semantic relevance, which still requires review. If a useful synchronization change cannot be made, document why and report the task as incomplete. Do not add timestamps or cosmetic edits to satisfy the check.
 
-Run `make check-agent-knowledge` before completion. It checks Git changes, instruction structure, skill frontmatter, required maintenance sections, substantive instruction changes and local Markdown links. For a pull request, CI runs the same checker against the PR base. Also run `git diff --check` and the implementation-specific checks applicable to the task. These structural checks do not establish semantic correctness.
+Run `make check-agent-knowledge` before completion. It checks Git changes, instruction structure, skill frontmatter, required maintenance sections, substantive instruction changes and local Markdown links. CI runs the same checker only on manual dispatch. Also run `git diff --check` and the implementation-specific checks applicable to the task. These structural checks do not establish semantic correctness.
 
 ### Definition of Done
 
@@ -205,7 +205,7 @@ for its contract tests. The validator requires Perl 5.14+ (JSON::PP core) and Gi
 core Perl modules, and publishes contract version `1.0.0`. All
 adopting repositories share the same CLI, AK001-AK006 identifiers, output
 schema, and exit codes (`0` pass, `1` policy failure, `2` execution/configuration
-error). For a pull request, pass both revisions with
+error). To compare committed revisions locally, pass both with
 `--scope range --base BASE_REF --head HEAD_REF`; compare from their merge base.
 
 Read [Agent Knowledge Validation Contract](docs/agent-knowledge-validation.md)
@@ -215,5 +215,6 @@ review; their warnings do not prove or disprove semantic correctness. Keep the
 canonical script and black-box Perl suite byte-identical across adopting
 repositories. Repository-specific requirements belong in the documented TOML
 configuration or a stable `AKX...` extension, never in a private fork of the
-shared rules. The GitHub PR workflow runs the same tests and range command;
-it does not edit files or require secrets.
+shared rules. All workflows are manual-only: start them from the Actions
+tab or with `gh workflow run`; the agent workflow runs the same tests and
+worktree validation and does not edit files or require secrets.
